@@ -1,6 +1,7 @@
 import path from "path";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
+import { secProxyPlugin } from "./vite-sec-proxy";
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -10,6 +11,7 @@ export default defineConfig({
   },
   plugins: [
     react(),
+    secProxyPlugin(),
   ],
   resolve: {
     preserveSymlinks: true,

@@ -7,7 +7,7 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import { RefreshCw, Database, Globe } from 'lucide-react';
 
 export default function Dashboard() {
-  const { filings, isLoading, error, lastUpdated, refetch, dataSource } = useSecFilings(14, true);
+  const { filings, isLoading, error, lastUpdated, refetch, dataSource } = useSecFilings(30, true);
   
   // Use mock data as the display source (with proper filing dates)
   // In production with a backend, this would use the filings from SEC API

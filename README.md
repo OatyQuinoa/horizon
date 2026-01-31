@@ -66,15 +66,26 @@ The design combines the sophistication of high-end financial publishing with the
 # Install dependencies
 npm install
 
-# Start development server
+# Start development server (includes SEC EDGAR proxy)
 npm run dev
 
 # Build for production
 npm run build
 
-# Preview production build
+# Run production server (serves build + SEC proxy)
+npm run start
+
+# Preview production build (Vite preview, no SEC proxy)
 npm run preview
 ```
+
+### Live SEC EDGAR Data
+
+IPO filings are fetched from SEC EDGAR (S-1 / S-1/A) for the **last 30 days**. SEC APIs do not allow browser CORS, so all requests go through a server-side proxy:
+
+- **Development**: The Vite dev server proxies `/api/sec/*` to `efts.sec.gov` and `data.sec.gov` (see `vite-sec-proxy.ts`).
+- **Production**: Run `npm run start` after build to serve the app and the same proxy from `server/index.js`.
+- **Supabase**: Deploy `supabase/functions/sec-proxy` and set `VITE_SEC_PROXY_URL` to the function URL so the app calls your Edge Function instead of same-origin `/api/sec`.
 
 ## Project Structure
 

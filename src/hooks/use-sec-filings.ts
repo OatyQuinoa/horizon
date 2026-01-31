@@ -10,7 +10,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Company } from '@/types';
 import { mockCompanies } from '@/data/mockData';
-import { RecentFiling, fetchRecentS1Filings, formatFilingDate, getRelativeDate } from '@/lib/sec-filing-service';
+import {
+  RecentFiling,
+  fetchRecentS1Filings,
+  fetchCompanyByCik,
+  isSoftwareCompany,
+  formatFilingDate,
+  getRelativeDate,
+} from '@/lib/sec-filing-service';
 
 interface UseSecFilingsResult {
   filings: Company[];
@@ -24,12 +31,12 @@ interface UseSecFilingsResult {
 
 /**
  * Hook to fetch and manage SEC filing data
- * 
- * @param daysBack - Number of days to look back for filings (default: 14)
- * @param softwareOnly - Whether to filter only software/tech companies
+ *
+ * @param daysBack - Number of days to look back for filings (default: 30, within a month)
+ * @param softwareOnly - Whether to filter only software/tech companies (used when enriching; all S-1 returned from SEC)
  */
 export function useSecFilings(
-  daysBack: number = 14,
+  daysBack: number = 30,
   softwareOnly: boolean = true
 ): UseSecFilingsResult {
   const [filings, setFilings] = useState<Company[]>([]);
@@ -45,25 +52,38 @@ export function useSecFilings(
     setDataSource('loading');
 
     try {
-      // Try to fetch from SEC API first
-      const secFilings = await fetchRecentS1Filings(daysBack);
-      
+      // Try to fetch from SEC API via proxy
+      let secFilings = await fetchRecentS1Filings(daysBack);
+
       if (secFilings.length > 0) {
-        // Successfully fetched from SEC
+        // Optionally filter to software/tech only (SIC 7370-7379) via Submissions API
+        if (softwareOnly) {
+          const filtered: RecentFiling[] = [];
+          for (let i = 0; i < secFilings.length; i++) {
+            const company = await fetchCompanyByCik(secFilings[i].cik);
+            if (company?.sicCode && isSoftwareCompany(company.sicCode)) {
+              filtered.push(secFilings[i]);
+            }
+            if (i < secFilings.length - 1) {
+              await new Promise((r) => setTimeout(r, 160));
+            }
+          }
+          secFilings = filtered;
+        }
+
         setRecentFilings(secFilings);
-        
-        // Convert to Company format for display
-        const convertedFilings: Company[] = secFilings.map((filing, index) => ({
+
+        const convertedFilings: Company[] = secFilings.map((filing) => ({
           id: filing.id,
           cik: filing.cik,
           name: filing.companyName,
-          sector: 'Technology', // Will be enriched with company lookup
+          sector: 'Technology',
           filingDate: filing.filingDate,
           accessionNumber: filing.accessionNumber,
           s1Link: filing.secIndexUrl,
           onWatchlist: false,
         }));
-        
+
         setFilings(convertedFilings);
         setDataSource('sec-api');
         setLastUpdated(new Date());

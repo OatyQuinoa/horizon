@@ -1,22 +1,21 @@
 /**
  * SEC EDGAR Filing Service
- * 
- * Fetches real S-1/IPO filings from SEC EDGAR using their public APIs.
- * 
- * Note: SEC EDGAR has CORS restrictions, so in a browser environment
- * we need to use a CORS proxy or server-side fetching. This service
- * is designed to work with a proxy prefix.
+ *
+ * Fetches real S-1/IPO filings from SEC EDGAR via a server-side proxy.
+ * SEC APIs (efts.sec.gov, data.sec.gov) do not allow CORS; all requests
+ * go through /api/sec/* (Vite dev proxy or production server).
+ *
+ * For production with Supabase: set VITE_SEC_PROXY_URL to your Edge Function URL.
  */
 
 import { Company } from '@/types';
 
-// SEC EDGAR full-text search API
-const SEC_EFTS_BASE = 'https://efts.sec.gov/LATEST/search-index';
-const SEC_DATA_BASE = 'https://data.sec.gov';
 const SEC_ARCHIVES_BASE = 'https://www.sec.gov/Archives/edgar/data';
 
-// CORS proxy for client-side requests (you can replace with your own proxy)
-const CORS_PROXY = 'https://corsproxy.io/?';
+/** Base URL for SEC proxy: same-origin /api/sec in dev and with Node server, or Supabase Edge Function URL */
+function getSecApiBase(): string {
+  return (import.meta.env.VITE_SEC_PROXY_URL as string) || '';
+}
 
 // Software-related SIC codes
 const SOFTWARE_SIC_CODES = [
@@ -27,12 +26,14 @@ export interface SECSearchResult {
   _id: string;
   _source: {
     ciks: string[];
-    display_names: string[];
+    display_names?: string[];
+    entity?: string;
     form: string;
     file_date: string;
-    file_num: string[];
-    root_form: string;
-    adsh: string;
+    file_num?: string[];
+    root_form?: string;
+    adsh?: string;
+    accession_number?: string;
     sequence?: string;
     file_description?: string;
   };
@@ -82,61 +83,54 @@ function constructSecIndexUrl(cik: string): string {
 }
 
 /**
- * Fetch recent S-1 filings from SEC EDGAR full-text search
- * 
- * @param daysBack - Number of days to look back (default: 14 for "past two weeks")
+ * Fetch recent S-1 filings from SEC EDGAR via proxy (last N days).
+ *
+ * @param daysBack - Number of days to look back (default: 30 for "within a month")
  * @param formTypes - Array of form types to search for
  */
 export async function fetchRecentS1Filings(
-  daysBack: number = 14,
+  daysBack: number = 30,
   formTypes: string[] = ['S-1', 'S-1/A']
 ): Promise<RecentFiling[]> {
   const endDate = new Date();
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - daysBack);
-  
+
   const dateFrom = startDate.toISOString().split('T')[0];
   const dateTo = endDate.toISOString().split('T')[0];
-  
-  // SEC EDGAR full-text search API query
-  const searchParams = new URLSearchParams({
-    dateRange: 'custom',
-    startdt: dateFrom,
-    enddt: dateTo,
-    forms: formTypes.join(','),
-    // Only return 100 most recent
-  });
-  
-  // Use the SEC EDGAR search API
-  const searchUrl = `https://efts.sec.gov/LATEST/search-index?q=*&dateRange=custom&startdt=${dateFrom}&enddt=${dateTo}&forms=${formTypes.join(',')}&from=0&size=100`;
-  
+
+  const base = getSecApiBase();
+  const searchUrl = `${base}/api/sec/search?dateFrom=${dateFrom}&dateTo=${dateTo}`;
+
   try {
-    // Note: This will fail due to CORS in browser. 
-    // In production, you'd use a server-side proxy or edge function
-    const response = await fetch(`${CORS_PROXY}${encodeURIComponent(searchUrl)}`, {
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'AIIS-Research/1.0',
-      },
+    const response = await fetch(searchUrl, {
+      headers: { Accept: 'application/json' },
     });
-    
+
     if (!response.ok) {
       console.error('SEC search failed:', response.status);
       return [];
     }
-    
+
     const data: SECSearchResponse = await response.json();
-    
-    return data.hits.hits.map((hit, index) => ({
-      id: hit._id || String(index),
-      cik: formatCik(hit._source.ciks[0]),
-      companyName: hit._source.display_names[0] || 'Unknown Company',
-      filingDate: hit._source.file_date,
-      formType: hit._source.form,
-      accessionNumber: hit._source.adsh,
-      filingUrl: constructFilingUrl(hit._source.ciks[0], hit._source.adsh),
-      secIndexUrl: constructSecIndexUrl(hit._source.ciks[0]),
-    }));
+    const hits = data.hits?.hits ?? [];
+
+    return hits.map((hit, index) => {
+      const src = hit._source;
+      const cik = src.ciks?.[0] ?? '';
+      const accessionNumber = src.adsh ?? src.accession_number ?? hit._id ?? String(index);
+      const companyName = src.display_names?.[0] ?? src.entity ?? 'Unknown Company';
+      return {
+        id: hit._id || String(index),
+        cik: formatCik(cik),
+        companyName,
+        filingDate: src.file_date,
+        formType: src.form,
+        accessionNumber,
+        filingUrl: constructFilingUrl(cik, accessionNumber),
+        secIndexUrl: constructSecIndexUrl(cik),
+      };
+    });
   } catch (error) {
     console.error('Error fetching SEC filings:', error);
     return [];
@@ -144,25 +138,22 @@ export async function fetchRecentS1Filings(
 }
 
 /**
- * Alternative: Fetch company data from SEC submissions endpoint
- * This is more reliable but requires knowing the CIK in advance
+ * Fetch company data from SEC submissions API via proxy.
  */
 export async function fetchCompanyByCik(cik: string): Promise<Partial<Company> | null> {
   const paddedCik = formatCik(cik);
-  const url = `${SEC_DATA_BASE}/submissions/CIK${paddedCik}.json`;
-  
+  const base = getSecApiBase();
+  const url = `${base}/api/sec/submissions/CIK${paddedCik}`;
+
   try {
-    const response = await fetch(`${CORS_PROXY}${encodeURIComponent(url)}`, {
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'AIIS-Research/1.0',
-      },
+    const response = await fetch(url, {
+      headers: { Accept: 'application/json' },
     });
-    
+
     if (!response.ok) {
       return null;
     }
-    
+
     const data = await response.json();
     
     // Find the most recent S-1 filing
