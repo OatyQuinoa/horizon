@@ -10,6 +10,33 @@ const MIN_REQUEST_INTERVAL_MS = 150;
 
 let lastRequestTime = 0;
 
+/** Parse SEC browse-edgar Atom feed (S-1 recent filings) into JSON */
+function parseSecAtomFeed(xml: string): { filings: Array<{ cik: string; companyName: string; filingDate: string; formType: string; accessionNumber: string }> } {
+  const filings: Array<{ cik: string; companyName: string; filingDate: string; formType: string; accessionNumber: string }> = [];
+  const entryRegex = /<entry>([\s\S]*?)<\/entry>/gi;
+  let match;
+  while ((match = entryRegex.exec(xml)) !== null) {
+    const block = match[1];
+    const titleMatch = block.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+    const idMatch = block.match(/<id[^>]*>([\s\S]*?)<\/id>/i);
+    const updatedMatch = block.match(/<updated[^>]*>([\s\S]*?)<\/updated>/i);
+    const categoryMatch = block.match(/<category[^>]*label="([^"]+)"[^>]*\/?>/i);
+    if (!titleMatch || !idMatch) continue;
+    const title = (titleMatch[1] || '').replace(/<[^>]+>/g, '').trim();
+    const id = (idMatch[1] || '').trim();
+    const updated = (updatedMatch && updatedMatch[1]) ? updatedMatch[1].trim() : '';
+    const formType = (categoryMatch && categoryMatch[1]) ? categoryMatch[1] : 'S-1';
+    const accessionMatch = id.match(/accession-number=([\w-]+)/i);
+    const accessionNumber = accessionMatch ? accessionMatch[1] : id.replace(/^.*,/, '');
+    const titleCompanyMatch = title.match(/^(?:S-1\/?A?)\s*[-–]\s*(.+?)\s*\((\d+)\)\s*(?:\(Filer\))?$/i);
+    const cik = titleCompanyMatch ? titleCompanyMatch[2].padStart(10, '0') : '';
+    const companyName = titleCompanyMatch ? titleCompanyMatch[1].trim() : title.replace(/^(?:S-1\/?A?)\s*[-–]\s*/i, '').replace(/\s*\(\d+\)\s*(?:\(Filer\))?$/, '').trim();
+    const filingDate = updated ? updated.slice(0, 10) : '';
+    filings.push({ cik, companyName, filingDate, formType, accessionNumber });
+  }
+  return { filings };
+}
+
 async function rateLimitedFetch(url: string, init?: RequestInit): Promise<Response> {
   const now = Date.now();
   const elapsed = now - lastRequestTime;
@@ -45,7 +72,7 @@ export function secProxyPlugin(): Plugin {
             return;
           }
 
-          // /api/sec/search?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD
+          // /api/sec/search?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD (full-text search; may return 0)
           const searchMatch = url.match(/^\/api\/sec\/search\?(.*)$/);
           if (searchMatch) {
             const params = new URLSearchParams(searchMatch[1]);
@@ -58,6 +85,22 @@ export function secProxyPlugin(): Plugin {
               'Content-Type': secRes.headers.get('Content-Type') ?? 'application/json',
             });
             res.end(body);
+            return;
+          }
+
+          // /api/sec/recent-s1?count=80 — SEC browse-edgar Atom feed (reliable list of recent S-1/S-1/A)
+          const recentS1Match = url.match(/^\/api\/sec\/recent-s1\?(.*)$/);
+          if (recentS1Match) {
+            const params = new URLSearchParams(recentS1Match[1]);
+            const count = Math.min(Number(params.get('count')) || 80, 80);
+            const atomUrl = `https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&CIK=&type=S-1&company=&dateb=&owner=exclude&start=0&count=${count}&output=atom`;
+            const secRes = await rateLimitedFetch(atomUrl, {
+              headers: { Accept: 'application/atom+xml, application/xml, text/xml' },
+            });
+            const xml = await secRes.text();
+            const json = parseSecAtomFeed(xml);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(json));
             return;
           }
 
