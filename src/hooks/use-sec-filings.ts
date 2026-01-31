@@ -77,6 +77,7 @@ export function useSecFilings(
           id: filing.id,
           cik: filing.cik,
           name: filing.companyName,
+          ticker: '',
           sector: 'Technology',
           filingDate: filing.filingDate,
           accessionNumber: filing.accessionNumber,
@@ -86,20 +87,22 @@ export function useSecFilings(
 
         setFilings(convertedFilings);
         setDataSource('sec-api');
+        setError(null);
         setLastUpdated(new Date());
       } else {
-        // Fallback to curated mock data
-        console.log('SEC API unavailable, using curated data');
-        setFilings(mockCompanies);
-        setDataSource('curated');
+        // No filings in date range: show empty, never old mock data
+        setFilings([]);
+        setRecentFilings([]);
+        setDataSource('sec-api');
+        setError(null);
         setLastUpdated(new Date());
       }
     } catch (err) {
       console.error('Failed to fetch SEC filings:', err);
-      // Fallback to mock data on error
-      setFilings(mockCompanies);
+      setFilings([]);
+      setRecentFilings([]);
       setDataSource('curated');
-      setError('Using curated data - live SEC feed unavailable');
+      setError('Live SEC data unavailable. Use npm run dev or npm run start so the proxy can reach SEC EDGAR.');
       setLastUpdated(new Date());
     } finally {
       setIsLoading(false);

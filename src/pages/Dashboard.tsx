@@ -8,12 +8,12 @@ import { RefreshCw, Database, Globe } from 'lucide-react';
 
 export default function Dashboard() {
   const { filings, isLoading, error, lastUpdated, refetch, dataSource } = useSecFilings(30, true);
-  
-  // Use mock data as the display source (with proper filing dates)
-  // In production with a backend, this would use the filings from SEC API
-  const displayFilings = mockCompanies;
-  const featuredCompany = displayFilings.find(c => c.featured);
-  const recentFilings = displayFilings.filter(c => !c.featured).slice(0, 6);
+
+  // Recent S-1 Filings: only SEC data from last 30 days (never old mock data)
+  const recentFilings = filings.slice(0, 6);
+  // Featured: first filing when we have live SEC data; otherwise first mock featured for hero only
+  const featuredFromSec = filings[0];
+  const featuredCompany = featuredFromSec ?? mockCompanies.find((c) => c.featured);
 
   const cardVariants = {
     hidden: { opacity: 0, y: 8 },
@@ -41,7 +41,7 @@ export default function Dashboard() {
         </motion.section>
       )}
 
-      {/* Recent Filings Section */}
+      {/* Recent Filings Section — last 30 days only from SEC EDGAR */}
       <section className="space-y-6 sm:space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div>
@@ -49,11 +49,10 @@ export default function Dashboard() {
               Recent S-1 Filings
             </h2>
             <p className="text-sm sm:text-base text-muted-foreground">
-              Software company IPO filings from SEC EDGAR
+              S-1 filings from the last 30 days · SEC EDGAR
             </p>
           </div>
-          
-          {/* Data source indicator */}
+
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <div className="flex items-center gap-1.5">
               {dataSource === 'sec-api' ? (
@@ -63,7 +62,7 @@ export default function Dashboard() {
               )}
               <span>{getDataSourceLabel(dataSource)}</span>
             </div>
-            <button 
+            <button
               onClick={() => refetch()}
               disabled={isLoading}
               className="p-1.5 rounded hover:bg-card/50 transition-colors disabled:opacity-50"
@@ -73,10 +72,18 @@ export default function Dashboard() {
             </button>
           </div>
         </div>
-        
+
         {error && (
           <div className="text-xs text-amber-500/80 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
             {error}
+          </div>
+        )}
+
+        {!isLoading && recentFilings.length === 0 && (
+          <div className="rounded-lg border border-border bg-card/30 px-4 py-8 text-center text-sm text-muted-foreground">
+            {dataSource === 'sec-api'
+              ? 'No S-1 filings in the last 30 days.'
+              : 'No recent filings to show. Start the dev server (npm run dev) or production server (npm run start) to load live SEC data.'}
           </div>
         )}
 
