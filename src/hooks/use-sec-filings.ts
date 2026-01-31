@@ -47,13 +47,16 @@ export function useSecFilings(
   const [dataSource, setDataSource] = useState<'sec-api' | 'curated' | 'loading'>('loading');
 
   const fetchFilings = useCallback(async () => {
+    const LOG = '[SEC IPO]';
     setIsLoading(true);
     setError(null);
     setDataSource('loading');
+    console.log(`${LOG} useSecFilings: fetching (daysBack=${daysBack}, softwareOnly=${softwareOnly})`);
 
     try {
       // Try to fetch from SEC API via proxy
       let secFilings = await fetchRecentS1Filings(daysBack);
+      console.log(`${LOG} useSecFilings: SEC returned ${secFilings.length} filings`);
 
       if (secFilings.length > 0) {
         // Optionally filter to software/tech only (SIC 7370-7379) via Submissions API
@@ -69,6 +72,7 @@ export function useSecFilings(
             }
           }
           secFilings = filtered;
+          console.log(`${LOG} useSecFilings: after software filter: ${secFilings.length} filings`);
         }
 
         setRecentFilings(secFilings);
@@ -89,8 +93,10 @@ export function useSecFilings(
         setDataSource('sec-api');
         setError(null);
         setLastUpdated(new Date());
+        console.log(`${LOG} useSecFilings: set ${convertedFilings.length} companies for display`);
       } else {
         // No filings in date range: show empty, never old mock data
+        console.log(`${LOG} useSecFilings: no filings in range; showing empty state`);
         setFilings([]);
         setRecentFilings([]);
         setDataSource('sec-api');
@@ -98,7 +104,7 @@ export function useSecFilings(
         setLastUpdated(new Date());
       }
     } catch (err) {
-      console.error('Failed to fetch SEC filings:', err);
+      console.error(`${LOG} useSecFilings: fetch failed`, err);
       setFilings([]);
       setRecentFilings([]);
       setDataSource('curated');

@@ -55,31 +55,48 @@ function isDateInRange(dateStr: string, dateFrom: string, dateTo: string): boole
 // Fetch recent S-1 filings: search first, then RSS fallback
 // ---------------------------------------------------------------------------
 
+const LOG_PREFIX = '[SEC IPO]';
+
 /**
  * Fetch recent S-1/S-1A filings. Tries SEC full-text search first; if 0 results or error,
  * uses the SEC browse-edgar Atom feed (reliable). Filters by date range (daysBack).
  */
 export async function fetchRecentS1Filings(daysBack: number): Promise<RecentFiling[]> {
   const { dateFrom, dateTo } = getDateRange(daysBack);
+  console.log(`${LOG_PREFIX} fetchRecentS1Filings(daysBack=${daysBack}) → dateFrom=${dateFrom}, dateTo=${dateTo}`);
 
   // 1) Try full-text search (may return 0 for some date ranges)
   const searchList = await fetchViaSearch(dateFrom, dateTo);
+  console.log(`${LOG_PREFIX} Search API returned ${searchList.length} filings`);
   if (searchList.length > 0) {
+    console.log(`${LOG_PREFIX} Using search results. First: ${searchList[0]?.companyName ?? '?'} (${searchList[0]?.filingDate})`);
     return searchList;
   }
 
   // 2) Fallback: SEC Atom feed (reliable list of recent S-1)
+  console.log(`${LOG_PREFIX} Falling back to recent-s1 (RSS/Atom) feed`);
   const rssList = await fetchViaRecentS1();
-  return rssList.filter((f) => isDateInRange(f.filingDate, dateFrom, dateTo));
+  const filtered = rssList.filter((f) => isDateInRange(f.filingDate, dateFrom, dateTo));
+  console.log(`${LOG_PREFIX} Recent-S1 feed: ${rssList.length} raw, ${filtered.length} in date range ${dateFrom}–${dateTo}`);
+  if (filtered.length > 0) {
+    console.log(`${LOG_PREFIX} First filing: ${filtered[0]?.companyName ?? '?'} (${filtered[0]?.filingDate})`);
+  }
+  return filtered;
 }
 
 async function fetchViaSearch(dateFrom: string, dateTo: string): Promise<RecentFiling[]> {
   const url = `${API_BASE}/api/sec/search?dateFrom=${encodeURIComponent(dateFrom)}&dateTo=${encodeURIComponent(dateTo)}`;
+  console.log(`${LOG_PREFIX} GET ${url}`);
   try {
     const res = await fetch(url);
-    if (!res.ok) return [];
+    console.log(`${LOG_PREFIX} Search response status=${res.status} contentType=${res.headers.get('content-type') ?? '?'}`);
+    if (!res.ok) {
+      console.warn(`${LOG_PREFIX} Search failed: ${res.status} ${res.statusText}`);
+      return [];
+    }
     const data = await res.json();
     const hits = data?.hits?.hits ?? [];
+    console.log(`${LOG_PREFIX} Search JSON: top-level keys=${Object.keys(data).join(', ')}, hits.hits.length=${hits?.length ?? 0}`);
     const list: RecentFiling[] = [];
     for (const hit of hits) {
       const src = hit?._source;
@@ -101,18 +118,28 @@ async function fetchViaSearch(dateFrom: string, dateTo: string): Promise<RecentF
       });
     }
     return list;
-  } catch {
+  } catch (e) {
+    console.warn(`${LOG_PREFIX} Search request failed:`, e);
     return [];
   }
 }
 
 async function fetchViaRecentS1(): Promise<RecentFiling[]> {
   const url = `${API_BASE}/api/sec/recent-s1?count=80`;
+  console.log(`${LOG_PREFIX} GET ${url}`);
   try {
     const res = await fetch(url);
-    if (!res.ok) return [];
+    console.log(`${LOG_PREFIX} Recent-S1 response status=${res.status} contentType=${res.headers.get('content-type') ?? '?'}`);
+    if (!res.ok) {
+      console.warn(`${LOG_PREFIX} Recent-S1 failed: ${res.status} ${res.statusText}`);
+      return [];
+    }
     const data = await res.json();
     const filings = data?.filings ?? [];
+    console.log(`${LOG_PREFIX} Recent-S1 JSON: keys=${Object.keys(data).join(', ')}, filings.length=${filings.length}`);
+    if (filings.length > 0 && typeof filings[0] === 'object') {
+      console.log(`${LOG_PREFIX} Recent-S1 first entry keys: ${Object.keys(filings[0]).join(', ')}`);
+    }
     return filings.map((f: { cik: string; companyName: string; filingDate: string; formType: string; accessionNumber: string }) => {
       const cik = (f.cik || '').padStart(10, '0');
       return {
@@ -125,7 +152,8 @@ async function fetchViaRecentS1(): Promise<RecentFiling[]> {
         secIndexUrl: constructCompanySearchUrl(cik, 'S-1'),
       };
     });
-  } catch {
+  } catch (e) {
+    console.warn(`${LOG_PREFIX} Recent-S1 request failed:`, e);
     return [];
   }
 }
