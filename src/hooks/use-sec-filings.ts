@@ -78,7 +78,7 @@ export function useSecFilings(
           cik: filing.cik,
           name: filing.companyName,
           ticker: '',
-          sector: 'Technology',
+          sector: softwareOnly ? 'Technology' : '—',
           filingDate: filing.filingDate,
           accessionNumber: filing.accessionNumber,
           s1Link: filing.secIndexUrl,

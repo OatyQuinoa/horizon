@@ -1,15 +1,44 @@
+import { useState } from 'react';
 import { mockCompanies } from '@/data/mockData';
 import FeaturedCompanyCard from '@/components/FeaturedCompanyCard';
 import FilingCard from '@/components/FilingCard';
 import { motion } from 'framer-motion';
 import { useSecFilings, getDataSourceLabel } from '@/hooks/use-sec-filings';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import { RefreshCw, Database, Globe } from 'lucide-react';
+import { RefreshCw, Database, Globe, Filter } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+
+const TIME_FRAME_OPTIONS = [
+  { value: '7', label: 'Last 7 days', days: 7 },
+  { value: '14', label: 'Last 14 days', days: 14 },
+  { value: '30', label: 'Last 30 days', days: 30 },
+  { value: '60', label: 'Last 60 days', days: 60 },
+] as const;
+
+const SECTOR_OPTIONS = [
+  { value: 'all', label: 'All sectors', softwareOnly: false },
+  { value: 'software', label: 'Software only (SIC 7370–7379)', softwareOnly: true },
+] as const;
 
 export default function Dashboard() {
-  const { filings, isLoading, error, lastUpdated, refetch, dataSource } = useSecFilings(30, true);
+  const [timeFrame, setTimeFrame] = useState<string>('30');
+  const [sectorFilter, setSectorFilter] = useState<string>('all');
 
-  // Recent S-1 Filings: only SEC data from last 30 days (never old mock data)
+  const daysBack = TIME_FRAME_OPTIONS.find((o) => o.value === timeFrame)?.days ?? 30;
+  const softwareOnly = SECTOR_OPTIONS.find((o) => o.value === sectorFilter)?.softwareOnly ?? false;
+
+  const { filings, isLoading, error, lastUpdated, refetch, dataSource } = useSecFilings(
+    daysBack,
+    softwareOnly
+  );
+
   const recentFilings = filings.slice(0, 6);
   // Featured: first filing when we have live SEC data; otherwise first mock featured for hero only
   const featuredFromSec = filings[0];
@@ -41,7 +70,7 @@ export default function Dashboard() {
         </motion.section>
       )}
 
-      {/* Recent Filings Section — last 30 days only from SEC EDGAR */}
+      {/* Recent Filings Section — SEC EDGAR with filters */}
       <section className="space-y-6 sm:space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div>
@@ -49,7 +78,7 @@ export default function Dashboard() {
               Recent S-1 Filings
             </h2>
             <p className="text-sm sm:text-base text-muted-foreground">
-              S-1 filings from the last 30 days · SEC EDGAR
+              Customize time frame and sector · SEC EDGAR
             </p>
           </div>
 
@@ -73,6 +102,50 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Filter options: time frame + sector */}
+        <div className="flex flex-wrap items-end gap-4 sm:gap-6 p-4 rounded-lg border border-border bg-card/30">
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-muted-foreground shrink-0" />
+            <span className="text-sm font-medium text-foreground shrink-0">Filters</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+            <div className="flex flex-col gap-1.5 min-w-[140px]">
+              <Label htmlFor="time-frame" className="text-xs text-muted-foreground">
+                Time frame
+              </Label>
+              <Select value={timeFrame} onValueChange={setTimeFrame}>
+                <SelectTrigger id="time-frame" className="h-9 w-full sm:w-[160px]">
+                  <SelectValue placeholder="Time frame" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TIME_FRAME_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5 min-w-[140px]">
+              <Label htmlFor="sector" className="text-xs text-muted-foreground">
+                Sector
+              </Label>
+              <Select value={sectorFilter} onValueChange={setSectorFilter}>
+                <SelectTrigger id="sector" className="h-9 w-full sm:w-[220px]">
+                  <SelectValue placeholder="Sector" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SECTOR_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+
         {error && (
           <div className="text-xs text-amber-500/80 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
             {error}
@@ -82,7 +155,7 @@ export default function Dashboard() {
         {!isLoading && recentFilings.length === 0 && (
           <div className="rounded-lg border border-border bg-card/30 px-4 py-8 text-center text-sm text-muted-foreground">
             {dataSource === 'sec-api'
-              ? 'No S-1 filings in the last 30 days.'
+              ? `No S-1 filings in the selected time frame (last ${daysBack} days${softwareOnly ? ', software only' : ''}).`
               : 'No recent filings to show. Start the dev server (npm run dev) or production server (npm run start) to load live SEC data.'}
           </div>
         )}
