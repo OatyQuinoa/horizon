@@ -247,6 +247,8 @@ export interface SecCompany {
   };
   s1Link: string;
   accessionNumber: string;
+  /** Primary document filename from SEC (e.g. ea0270193-03.htm) for direct prospectus URL */
+  primaryDocument?: string;
   sicCode?: string;
   sicDescription?: string;
 }
@@ -272,6 +274,7 @@ export async function fetchCompanyById(id: string): Promise<SecCompany | null> {
     const accNums = data?.filings?.recent?.accessionNumber ?? [];
     const forms = data?.filings?.recent?.form ?? [];
     const filingDates = data?.filings?.recent?.filingDate ?? [];
+    const primaryDocs = data?.filings?.recent?.primaryDocument ?? [];
     const accNorm = accessionNumber.replace(/-/g, '');
     let idx = accNums.findIndex((a: string) => (a || '') === accessionNumber);
     if (idx < 0) idx = accNums.findIndex((a: string) => (a || '').replace(/-/g, '') === accNorm);
@@ -279,6 +282,7 @@ export async function fetchCompanyById(id: string): Promise<SecCompany | null> {
     const filingDate = filingDates[idx] ?? '';
     const accFromApi = accNums[idx] ?? accessionNumber;
     const formFromApi = forms[idx] ?? 'S-1';
+    const primaryDoc = (primaryDocs[idx] ?? '').trim();
 
     const filingDatesOut: SecCompany['filingDates'] = {};
     let s1Earliest: string | null = null;
@@ -308,6 +312,7 @@ export async function fetchCompanyById(id: string): Promise<SecCompany | null> {
       filingDates: Object.keys(filingDatesOut).length > 0 ? filingDatesOut : undefined,
       s1Link: constructCompanySearchUrl(padded, formFromApi),
       accessionNumber: accFromApi,
+      primaryDocument: primaryDoc && /\.(htm|html)$/i.test(primaryDoc) ? primaryDoc : undefined,
       sicCode: sic != null ? String(sic) : undefined,
       sicDescription: sicDescription != null ? String(sicDescription) : undefined,
     };

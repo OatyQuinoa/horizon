@@ -24,6 +24,8 @@ export interface Company {
   filingDates?: FilingDates;
   s1Link: string; // Direct link to SEC EDGAR filing
   accessionNumber?: string; // SEC accession number for the filing
+  /** Primary document filename from SEC (e.g. ea0270193-03.htm) for direct prospectus URL */
+  primaryDocument?: string;
   /** Pipeline = intent; Completed = 424B4 filed (IPO priced) */
   ipoStatus?: IpoStatus;
   ipoDate?: string;

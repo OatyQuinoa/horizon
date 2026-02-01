@@ -1,12 +1,28 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 
-function ViewProspectusLink({ cik, accessionNumber }: { cik: string; accessionNumber: string }) {
+function ViewProspectusLink({
+  cik,
+  accessionNumber,
+  primaryDocument,
+}: {
+  cik: string;
+  accessionNumber: string;
+  primaryDocument?: string;
+}) {
   const [url, setUrl] = useState<string | null>(null);
   const cleanCik = String(cik).replace(/\D/g, '').replace(/^0+/, '') || cik;
   const accNoDashes = accessionNumber.replace(/-/g, '');
+  const directProspectusUrl =
+    primaryDocument && /\.(htm|html)$/i.test(primaryDocument)
+      ? `https://www.sec.gov/Archives/edgar/data/${cleanCik}/${accNoDashes}/${primaryDocument}`
+      : null;
   const fallbackIndexUrl = `https://www.sec.gov/Archives/edgar/data/${cleanCik}/${accNoDashes}/${accessionNumber}-index.htm`;
   useEffect(() => {
+    if (directProspectusUrl) {
+      setUrl(directProspectusUrl);
+      return;
+    }
     let cancelled = false;
     fetch(`/api/sec/prospectus-url?cik=${encodeURIComponent(cik)}&accession=${encodeURIComponent(accessionNumber)}`)
       .then((r) => (r.ok ? r.json() : null))
@@ -15,8 +31,8 @@ function ViewProspectusLink({ cik, accessionNumber }: { cik: string; accessionNu
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [cik, accessionNumber]);
-  const displayUrl = url ?? fallbackIndexUrl;
+  }, [cik, accessionNumber, directProspectusUrl]);
+  const displayUrl = directProspectusUrl ?? url ?? fallbackIndexUrl;
   return (
     <a
       href={displayUrl}
@@ -51,16 +67,25 @@ export default function CompanyDetail() {
   const [fetchedSec, setFetchedSec] = useState<Company | null>(null);
   const [isFetching, setIsFetching] = useState(false);
 
-  const company = fromContext ?? fromMock ?? fetchedSec;
+  const company = fetchedSec ?? fromContext ?? fromMock;
 
   useEffect(() => {
-    if (id && !fromContext && !fromMock && /^\d{10}-[\d-]+$/.test(id)) {
+    if (!id || !/^\d{10}-[\d-]+$/.test(id)) return;
+    if (!fromContext && !fromMock) {
       setIsFetching(true);
       fetchCompanyById(id)
         .then((sec) => {
           if (sec) setFetchedSec(sec as unknown as Company);
         })
         .finally(() => setIsFetching(false));
+      return;
+    }
+    if (fromContext && fromContext.accessionNumber && fromContext.cik && !fromContext.primaryDocument) {
+      fetchCompanyById(id)
+        .then((sec) => {
+          if (sec) setFetchedSec({ ...fromContext, ...sec, primaryDocument: sec.primaryDocument } as Company);
+        })
+        .catch(() => {});
     }
   }, [id, fromContext, fromMock]);
 
@@ -278,7 +303,11 @@ export default function CompanyDetail() {
                 <ExternalLink className="w-3 h-3" />
               </a>
               {company.accessionNumber && company.cik && (
-                <ViewProspectusLink cik={company.cik} accessionNumber={company.accessionNumber} />
+                <ViewProspectusLink
+                  cik={company.cik}
+                  accessionNumber={company.accessionNumber}
+                  primaryDocument={company.primaryDocument}
+                />
               )}
             </div>
             {company.accessionNumber && company.cik && (

@@ -159,9 +159,17 @@ export function secProxyPlugin(): Plugin {
                 const indexRes = await rateLimitedFetch(indexUrl, {
                   headers: { 'User-Agent': SEC_USER_AGENT, Accept: 'text/html' },
                 });
+                const finalUrl = indexRes.url || indexUrl;
+                const redirectedToSearch = /search-filings/.test(finalUrl) || !/\/Archives\/edgar\//.test(finalUrl);
                 if (!indexRes.ok) {
                   res.writeHead(indexRes.status, { 'Content-Type': 'application/json' });
                   res.end(JSON.stringify({ error: 'Filing index not found' }));
+                  return;
+                }
+                const indexUrlFallback = `https://www.sec.gov/Archives/edgar/data/${cleanCik.replace(/^0+/, '') || cleanCik}/${accNoDashes}/${accession}-index.htm`;
+                if (redirectedToSearch) {
+                  res.writeHead(200, { 'Content-Type': 'application/json' });
+                  res.end(JSON.stringify({ url: indexUrlFallback }));
                   return;
                 }
                 const indexHtml = await indexRes.text();
@@ -174,8 +182,8 @@ export function secProxyPlugin(): Plugin {
                 let docPath = first
                   ? (first[1].startsWith('http') ? first[1] : new URL(first[1].trim(), baseUrl).href)
                   : null;
-                if (!docPath) {
-                  docPath = `https://www.sec.gov/Archives/edgar/data/${cleanCik.replace(/^0+/, '') || cleanCik}/${accNoDashes}/${accession}-index.htm`;
+                if (!docPath || !docPath.startsWith('https://www.sec.gov/Archives/edgar/') || /search-filings/.test(docPath)) {
+                  docPath = indexUrlFallback;
                 }
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ url: docPath }));
