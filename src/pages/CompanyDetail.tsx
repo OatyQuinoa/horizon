@@ -11,6 +11,7 @@ import { useCompaniesOptional } from '@/context/CompaniesContext';
 import { fetchCompanyById } from '@/lib/sec-filing-service';
 import { Company } from '@/types';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import ProspectusBriefingCard from '@/components/ProspectusBriefing';
 
 export default function CompanyDetail() {
   const { id } = useParams<{ id: string }>();
@@ -202,7 +203,7 @@ export default function CompanyDetail() {
               </div>
             )}
           </div>
-          <div className="mt-4 pt-4 border-t border-border">
+          <div className="mt-4 pt-4 border-t border-border space-y-4">
             <a
               href={company.s1Link}
               target="_blank"
@@ -210,9 +211,19 @@ export default function CompanyDetail() {
               className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
             >
               <FileText className="w-4 h-4" />
-              View Full S-1 Filing on SEC EDGAR
+              View Full Filing on SEC EDGAR
               <ExternalLink className="w-3 h-3" />
             </a>
+            {company.accessionNumber && company.cik && (
+              <ProspectusBriefingCard
+                companyName={company.name}
+                cik={company.cik}
+                accessionNumber={company.accessionNumber}
+                filingDate={company.filingDate}
+                formType={company.ipoStatus === 'completed' ? '424B4' : 'S-1'}
+                onError={(msg) => toast.error(msg)}
+              />
+            )}
           </div>
         </div>
       </motion.section>
