@@ -1,8 +1,17 @@
 /**
- * Vercel serverless: proxy SEC full-text search for S-1/S-1A filings.
- * GET /api/sec/search?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD
+ * Vercel serverless: proxy SEC full-text search for IPO-related filings.
+ * GET /api/sec/search?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD&layer=pipeline|confirmation
+ *
+ * layer=pipeline  → S-1, S-1/A, F-1, F-1/A (intent / registration)
+ * layer=confirmation → 424B4 (final prospectus / IPO completed)
+ * layer=all or omit → pipeline only (default)
  */
 const SEC_USER_AGENT = 'AIIS-InvestmentResearch/1.0 (contact@aiis-research.com)';
+
+const LAYER_QUERIES = {
+  pipeline: 'forms:(S-1 OR "S-1/A" OR F-1 OR "F-1/A")',
+  confirmation: 'forms:424B4',
+};
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -12,7 +21,9 @@ export default async function handler(req, res) {
   }
   const dateFrom = req.query.dateFrom ?? '';
   const dateTo = req.query.dateTo ?? '';
-  const searchUrl = `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent('forms:(S-1 OR "S-1/A")')}&dateRange=custom&startdt=${dateFrom}&enddt=${dateTo}&from=0&size=100`;
+  const layer = req.query.layer ?? 'pipeline';
+  const formsQuery = LAYER_QUERIES[layer] ?? LAYER_QUERIES.pipeline;
+  const searchUrl = `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(formsQuery)}&dateRange=custom&startdt=${dateFrom}&enddt=${dateTo}&from=0&size=100`;
   try {
     const secRes = await fetch(searchUrl, {
       headers: {

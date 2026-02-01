@@ -84,7 +84,7 @@ export default function Dashboard() {
               Recent S-1 Filings
             </h2>
             <p className="text-sm sm:text-base text-muted-foreground">
-              S-1 registration dates (not IPO/offer dates) · SEC EDGAR
+              Pipeline (S-1/F-1) + Completed (424B4) · SEC EDGAR
             </p>
           </div>
 

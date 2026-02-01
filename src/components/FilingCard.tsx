@@ -24,6 +24,18 @@ export default function FilingCard({ company }: FilingCardProps) {
         </div>
         
         <div className="flex items-center gap-2 flex-wrap">
+          {company.ipoStatus && (
+            <span
+              className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                company.ipoStatus === 'completed'
+                  ? 'bg-green-500/15 text-green-600 dark:text-green-400'
+                  : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+              }`}
+              title={company.ipoStatus === 'completed' ? 'IPO completed (424B4 filed)' : 'IPO pipeline (S-1/F-1 filed)'}
+            >
+              {company.ipoStatus === 'completed' ? 'IPO Priced' : 'Pipeline'}
+            </span>
+          )}
           <span className="text-xs px-2.5 sm:px-3 py-1 bg-muted/30 rounded-full text-muted-foreground uppercase tracking-wide">
             {company.sector}
           </span>
@@ -41,7 +53,7 @@ export default function FilingCard({ company }: FilingCardProps) {
           </div>
           <div className="flex items-center gap-1 text-primary/70">
             <FileText className="w-3 h-3" />
-            <span className="text-xs">S-1</span>
+            <span className="text-xs font-mono">SEC</span>
           </div>
         </div>
         

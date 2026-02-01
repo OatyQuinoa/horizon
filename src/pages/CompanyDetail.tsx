@@ -99,8 +99,19 @@ export default function CompanyDetail() {
           <div className="flex-1 w-full">
             <div className="flex items-center gap-2 sm:gap-3 mb-2 flex-wrap">
               <span className="font-mono text-lg sm:text-xl text-primary font-medium">
-                {company.ticker}
+                {company.ticker || (company.cik ? `CIK ${company.cik.replace(/^0+/, '')}` : '—')}
               </span>
+              {company.ipoStatus && (
+                <span
+                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    company.ipoStatus === 'completed'
+                      ? 'bg-green-500/15 text-green-600 dark:text-green-400'
+                      : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                  }`}
+                >
+                  {company.ipoStatus === 'completed' ? 'IPO Priced' : 'Pipeline'}
+                </span>
+              )}
               <span className="text-xs sm:text-sm px-2.5 sm:px-3 py-1 bg-muted/50 rounded-full text-muted-foreground uppercase tracking-wide">
                 {company.sector}
               </span>

@@ -81,11 +81,12 @@ export function constructFilingUrl(cik: string, accessionNumber: string, documen
 }
 
 /**
- * Construct SEC EDGAR company search URL
+ * Construct SEC EDGAR company search URL for a given form type.
+ * Use S-1 for domestic registration, F-1 for foreign, 424B4 for final prospectus.
  */
 export function constructCompanySearchUrl(cik: string, formType: string = 'S-1'): string {
   const paddedCik = padCik(cik);
-  return `${SEC_CONFIG.baseUrls.browse}?action=getcompany&CIK=${paddedCik}&type=${formType}&dateb=&owner=exclude&count=40`;
+  return `${SEC_CONFIG.baseUrls.browse}?action=getcompany&CIK=${paddedCik}&type=${encodeURIComponent(formType)}&dateb=&owner=exclude&count=40`;
 }
 
 /**

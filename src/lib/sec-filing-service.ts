@@ -1,9 +1,12 @@
 /**
- * SEC EDGAR S-1 filing service
+ * SEC EDGAR IPO filing service
  *
- * Fetches recent S-1/S-1A filings via app proxy (/api/sec/*).
- * Strategy: try full-text search first; if 0 results or error, use RSS/Atom feed (reliable).
- * No SIC filtering here — all sectors; optional software-only filter is applied in the hook.
+ * Dual-layer model:
+ * - Pipeline (intent): S-1, S-1/A, F-1, F-1/A — "IPO may happen"
+ * - Confirmation (completed): 424B4 — "IPO did happen"
+ *
+ * Fetches via app proxy (/api/sec/*). Strategy: try full-text search first;
+ * if 0 results or error, use RSS/Atom feeds. Correlates by CIK to classify status.
  */
 
 import { constructCompanySearchUrl, isSoftwareCompany as isSoftwareSic, padCik } from '@/lib/sec-api';
@@ -14,6 +17,9 @@ const API_BASE = '';
 // Types
 // ---------------------------------------------------------------------------
 
+/** IPO status: pipeline = intent/filing, completed = 424B4 filed (IPO priced) */
+export type IpoStatus = 'pipeline' | 'completed';
+
 export interface RecentFiling {
   id: string;
   cik: string;
@@ -22,6 +28,8 @@ export interface RecentFiling {
   formType: string;
   accessionNumber: string;
   secIndexUrl: string;
+  /** Pipeline = S-1/F-1 intent; Completed = 424B4 filed */
+  ipoStatus?: IpoStatus;
 }
 
 export interface CompanyEnrichment {
@@ -52,51 +60,84 @@ function isDateInRange(dateStr: string, dateFrom: string, dateTo: string): boole
 }
 
 // ---------------------------------------------------------------------------
-// Fetch recent S-1 filings: search first, then RSS fallback
+// Fetch IPO filings: pipeline (S-1/F-1) + confirmation (424B4) + correlation
 // ---------------------------------------------------------------------------
 
 const LOG_PREFIX = '[SEC IPO]';
 
 /**
- * Fetch recent S-1/S-1A filings. Tries SEC full-text search first; if 0 results or error,
- * uses the SEC browse-edgar Atom feed (reliable). Filters by date range (daysBack).
+ * Fetch IPO-related filings with dual-layer model:
+ * - Pipeline: S-1, S-1/A, F-1, F-1/A (intent)
+ * - Confirmation: 424B4 (completed)
+ * Correlates by CIK to set ipoStatus: 'pipeline' | 'completed'.
  */
-export async function fetchRecentS1Filings(daysBack: number): Promise<RecentFiling[]> {
+export async function fetchIPOFilings(daysBack: number): Promise<RecentFiling[]> {
   const { dateFrom, dateTo } = getDateRange(daysBack);
-  console.log(`${LOG_PREFIX} fetchRecentS1Filings(daysBack=${daysBack}) → dateFrom=${dateFrom}, dateTo=${dateTo}`);
+  console.log(`${LOG_PREFIX} fetchIPOFilings(daysBack=${daysBack}) → dateFrom=${dateFrom}, dateTo=${dateTo}`);
 
-  // 1) Try full-text search (may return 0 for some date ranges)
-  const searchList = await fetchViaSearch(dateFrom, dateTo);
-  console.log(`${LOG_PREFIX} Search API returned ${searchList.length} filings`);
-  if (searchList.length > 0) {
-    console.log(`${LOG_PREFIX} Using search results. First: ${searchList[0]?.companyName ?? '?'} (${searchList[0]?.filingDate})`);
-    return searchList;
+  const [pipelineList, completedList] = await Promise.all([
+    fetchPipelineFilings(dateFrom, dateTo),
+    fetchCompletedIPOs(dateFrom, dateTo),
+  ]);
+
+  const merged: RecentFiling[] = [];
+  const seen = new Set<string>();
+
+  for (const f of completedList) {
+    const key = `${f.cik}-${f.accessionNumber}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push({ ...f, ipoStatus: 'completed' as const });
+  }
+  for (const f of pipelineList) {
+    const key = `${f.cik}-${f.accessionNumber}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push({ ...f, ipoStatus: 'pipeline' as const });
   }
 
-  // 2) Fallback: SEC Atom feed (reliable list of recent S-1)
-  console.log(`${LOG_PREFIX} Falling back to recent-s1 (RSS/Atom) feed`);
-  const rssList = await fetchViaRecentS1();
-  const filtered = rssList.filter((f) => isDateInRange(f.filingDate, dateFrom, dateTo));
-  console.log(`${LOG_PREFIX} Recent-S1 feed: ${rssList.length} raw, ${filtered.length} in date range ${dateFrom}–${dateTo}`);
-  if (filtered.length > 0) {
-    console.log(`${LOG_PREFIX} First filing: ${filtered[0]?.companyName ?? '?'} (${filtered[0]?.filingDate})`);
-  }
-  return filtered;
+  merged.sort((a, b) => (b.filingDate || '').localeCompare(a.filingDate || ''));
+  console.log(`${LOG_PREFIX} Merged: ${merged.length} total (${completedList.length} completed, ${pipelineList.length} pipeline)`);
+  return merged;
 }
 
-async function fetchViaSearch(dateFrom: string, dateTo: string): Promise<RecentFiling[]> {
-  const url = `${API_BASE}/api/sec/search?dateFrom=${encodeURIComponent(dateFrom)}&dateTo=${encodeURIComponent(dateTo)}`;
+/**
+ * Fetch pipeline filings (S-1, S-1/A, F-1, F-1/A). Backward-compatible entry point.
+ */
+export async function fetchRecentS1Filings(daysBack: number): Promise<RecentFiling[]> {
+  return fetchIPOFilings(daysBack);
+}
+
+async function fetchPipelineFilings(dateFrom: string, dateTo: string): Promise<RecentFiling[]> {
+  const searchList = await fetchViaSearch(dateFrom, dateTo, 'pipeline');
+  if (searchList.length > 0) {
+    return searchList.map((f) => ({ ...f, secIndexUrl: constructCompanySearchUrl(f.cik, f.formType || 'S-1') }));
+  }
+  const [s1List, f1List] = await Promise.all([fetchViaRecentForm('S-1'), fetchViaRecentForm('F-1')]);
+  const combined = [...s1List, ...f1List].filter((f) => isDateInRange(f.filingDate, dateFrom, dateTo));
+  return combined;
+}
+
+async function fetchCompletedIPOs(dateFrom: string, dateTo: string): Promise<RecentFiling[]> {
+  const searchList = await fetchViaSearch(dateFrom, dateTo, 'confirmation');
+  if (searchList.length > 0) {
+    return searchList.map((f) => ({ ...f, secIndexUrl: constructCompanySearchUrl(f.cik, '424B4') }));
+  }
+  const list = await fetchViaRecent424B4();
+  return list.filter((f) => isDateInRange(f.filingDate, dateFrom, dateTo));
+}
+
+async function fetchViaSearch(dateFrom: string, dateTo: string, layer: 'pipeline' | 'confirmation' = 'pipeline'): Promise<RecentFiling[]> {
+  const url = `${API_BASE}/api/sec/search?dateFrom=${encodeURIComponent(dateFrom)}&dateTo=${encodeURIComponent(dateTo)}&layer=${layer}`;
   console.log(`${LOG_PREFIX} GET ${url}`);
   try {
     const res = await fetch(url);
-    console.log(`${LOG_PREFIX} Search response status=${res.status} contentType=${res.headers.get('content-type') ?? '?'}`);
     if (!res.ok) {
-      console.warn(`${LOG_PREFIX} Search failed: ${res.status} ${res.statusText}`);
+      console.warn(`${LOG_PREFIX} Search (${layer}) failed: ${res.status}`);
       return [];
     }
     const data = await res.json();
     const hits = data?.hits?.hits ?? [];
-    console.log(`${LOG_PREFIX} Search JSON: top-level keys=${Object.keys(data).join(', ')}, hits.hits.length=${hits?.length ?? 0}`);
     const list: RecentFiling[] = [];
     for (const hit of hits) {
       const src = hit?._source;
@@ -114,32 +155,24 @@ async function fetchViaSearch(dateFrom: string, dateTo: string): Promise<RecentF
         filingDate: fileDate,
         formType: form,
         accessionNumber,
-        secIndexUrl: constructCompanySearchUrl(cik, 'S-1'),
+        secIndexUrl: constructCompanySearchUrl(cik, form),
       });
     }
     return list;
   } catch (e) {
-    console.warn(`${LOG_PREFIX} Search request failed:`, e);
+    console.warn(`${LOG_PREFIX} Search (${layer}) request failed:`, e);
     return [];
   }
 }
 
-async function fetchViaRecentS1(): Promise<RecentFiling[]> {
-  const url = `${API_BASE}/api/sec/recent-s1?count=80`;
-  console.log(`${LOG_PREFIX} GET ${url}`);
+async function fetchViaRecentForm(formType: 'S-1' | 'F-1'): Promise<RecentFiling[]> {
+  const endpoint = formType === 'S-1' ? 'recent-s1' : 'recent-f1';
+  const url = `${API_BASE}/api/sec/${endpoint}?count=80`;
   try {
     const res = await fetch(url);
-    console.log(`${LOG_PREFIX} Recent-S1 response status=${res.status} contentType=${res.headers.get('content-type') ?? '?'}`);
-    if (!res.ok) {
-      console.warn(`${LOG_PREFIX} Recent-S1 failed: ${res.status} ${res.statusText}`);
-      return [];
-    }
+    if (!res.ok) return [];
     const data = await res.json();
     const filings = data?.filings ?? [];
-    console.log(`${LOG_PREFIX} Recent-S1 JSON: keys=${Object.keys(data).join(', ')}, filings.length=${filings.length}`);
-    if (filings.length > 0 && typeof filings[0] === 'object') {
-      console.log(`${LOG_PREFIX} Recent-S1 first entry keys: ${Object.keys(filings[0]).join(', ')}`);
-    }
     return filings.map((f: { cik: string; companyName: string; filingDate: string; formType: string; accessionNumber: string }) => {
       const cik = (f.cik || '').padStart(10, '0');
       return {
@@ -147,13 +180,36 @@ async function fetchViaRecentS1(): Promise<RecentFiling[]> {
         cik,
         companyName: f.companyName || 'Unknown',
         filingDate: f.filingDate || '',
-        formType: f.formType || 'S-1',
+        formType: f.formType || formType,
         accessionNumber: f.accessionNumber || '',
-        secIndexUrl: constructCompanySearchUrl(cik, 'S-1'),
+        secIndexUrl: constructCompanySearchUrl(cik, f.formType || formType),
       };
     });
-  } catch (e) {
-    console.warn(`${LOG_PREFIX} Recent-S1 request failed:`, e);
+  } catch {
+    return [];
+  }
+}
+
+async function fetchViaRecent424B4(): Promise<RecentFiling[]> {
+  const url = `${API_BASE}/api/sec/recent-424b4?count=80`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const filings = data?.filings ?? [];
+    return filings.map((f: { cik: string; companyName: string; filingDate: string; formType: string; accessionNumber: string }) => {
+      const cik = (f.cik || '').padStart(10, '0');
+      return {
+        id: `${cik}-${f.accessionNumber || f.filingDate}`,
+        cik,
+        companyName: f.companyName || 'Unknown',
+        filingDate: f.filingDate || '',
+        formType: f.formType || '424B4',
+        accessionNumber: f.accessionNumber || '',
+        secIndexUrl: constructCompanySearchUrl(cik, '424B4'),
+      };
+    });
+  } catch {
     return [];
   }
 }
@@ -217,6 +273,7 @@ export async function fetchCompanyById(id: string): Promise<SecCompany | null> {
     if (idx < 0) return null;
     const filingDate = filingDates[idx] ?? '';
     const accFromApi = accNums[idx] ?? accessionNumber;
+    const formFromApi = forms[idx] ?? 'S-1';
     return {
       id,
       cik: padded,
@@ -224,7 +281,7 @@ export async function fetchCompanyById(id: string): Promise<SecCompany | null> {
       ticker: tickers[0] ?? '',
       sector: sicDescription ?? '—',
       filingDate,
-      s1Link: constructCompanySearchUrl(padded, 'S-1'),
+      s1Link: constructCompanySearchUrl(padded, formFromApi),
       accessionNumber: accFromApi,
       sicCode: sic != null ? String(sic) : undefined,
       sicDescription: sicDescription != null ? String(sicDescription) : undefined,

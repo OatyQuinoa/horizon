@@ -86,6 +86,7 @@ export function useSecFilings(
           filingDate: filing.filingDate,
           accessionNumber: filing.accessionNumber,
           s1Link: filing.secIndexUrl,
+          ipoStatus: filing.ipoStatus,
           onWatchlist: false,
         }));
 

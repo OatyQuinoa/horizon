@@ -1,3 +1,6 @@
+/** IPO status: pipeline = S-1/F-1 intent, completed = 424B4 filed */
+export type IpoStatus = 'pipeline' | 'completed';
+
 export interface Company {
   id: string;
   cik: string; // SEC Central Index Key (10-digit, zero-padded)
@@ -9,6 +12,8 @@ export interface Company {
   filingDate: string;
   s1Link: string; // Direct link to SEC EDGAR filing
   accessionNumber?: string; // SEC accession number for the filing
+  /** Pipeline = intent; Completed = 424B4 filed (IPO priced) */
+  ipoStatus?: IpoStatus;
   ipoDate?: string;
   ipoPrice?: number;
   currentPrice?: number;
