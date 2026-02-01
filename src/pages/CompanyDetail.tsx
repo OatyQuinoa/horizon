@@ -39,6 +39,14 @@ export default function CompanyDetail() {
   const [concerns, setConcerns] = useState(company?.concerns || '');
   const [onWatchlist, setOnWatchlist] = useState(company?.onWatchlist || false);
 
+  useEffect(() => {
+    if (company) {
+      setThesis(company.thesis || '');
+      setConcerns(company.concerns || '');
+      setOnWatchlist(company.onWatchlist || false);
+    }
+  }, [company?.id]);
+
   if (isFetching) {
     return (
       <div className="flex items-center justify-center py-24">

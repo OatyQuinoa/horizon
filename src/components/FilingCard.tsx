@@ -19,7 +19,7 @@ export default function FilingCard({ company }: FilingCardProps) {
             {company.name}
           </h3>
           <span className="font-mono text-xs sm:text-sm text-primary font-medium whitespace-nowrap">
-            {company.ticker}
+            {company.ticker || (company.cik ? `CIK ${company.cik.replace(/^0+/, '')}` : '—')}
           </span>
         </div>
         

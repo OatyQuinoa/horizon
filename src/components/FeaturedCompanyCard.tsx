@@ -25,7 +25,7 @@ export default function FeaturedCompanyCard({ company }: FeaturedCompanyCardProp
           </h2>
           <div className="flex items-center gap-3 flex-wrap">
             <span className="font-mono text-base sm:text-lg text-primary font-medium">
-              {company.ticker}
+              {company.ticker || `CIK ${company.cik?.replace(/^0+/, '') || '—'}`}
             </span>
             <span className="text-xs sm:text-sm px-3 py-1 bg-muted/50 rounded-full text-muted-foreground uppercase tracking-wide">
               {company.sector}
