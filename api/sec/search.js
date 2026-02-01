@@ -6,7 +6,7 @@
  * layer=confirmation → 424B4 (final prospectus / IPO completed)
  * layer=all or omit → pipeline only (default)
  */
-const SEC_USER_AGENT = 'AIIS-InvestmentResearch/1.0 (contact@aiis-research.com)';
+const SEC_USER_AGENT = 'Prospecti-InvestmentResearch/1.0 (contact@prospecti-app.com)';
 
 const LAYER_QUERIES = {
   pipeline: 'forms:(S-1 OR "S-1/A" OR F-1 OR "F-1/A")',

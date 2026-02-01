@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const { URL } = require('url');
 
-const SEC_USER_AGENT = 'AIIS-InvestmentResearch/1.0 (contact@aiis-research.com)';
+const SEC_USER_AGENT = 'Prospecti-InvestmentResearch/1.0 (contact@prospecti-app.com)';
 const MIN_REQUEST_INTERVAL_MS = 150;
 const DIST = path.join(__dirname, '..', 'dist');
 

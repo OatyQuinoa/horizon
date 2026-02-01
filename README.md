@@ -1,4 +1,4 @@
-# AIIS: Investment Research Dashboard
+# Prospecti: Investment Research Dashboard
 
 A personal investment research tool for tracking software IPOs. Built for thoughtful, long-term decision-making with a focus on weekly insights, post-IPO price movements, and deep-dive analyses.
 

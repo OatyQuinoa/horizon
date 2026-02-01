@@ -5,7 +5,7 @@
  */
 import type { Plugin } from 'vite';
 
-const SEC_USER_AGENT = 'AIIS-InvestmentResearch/1.0 (contact@aiis-research.com)';
+const SEC_USER_AGENT = 'Prospecti-InvestmentResearch/1.0 (contact@prospecti-app.com)';
 const MIN_REQUEST_INTERVAL_MS = 150;
 
 let lastRequestTime = 0;
@@ -156,25 +156,26 @@ export function secProxyPlugin(): Plugin {
               const indexUrl = `https://www.sec.gov/Archives/edgar/data/${cleanCik.replace(/^0+/, '') || cleanCik}/${accNoDashes}/${accession}-index.htm`;
               const baseUrl = `https://www.sec.gov/Archives/edgar/data/${cleanCik.replace(/^0+/, '') || cleanCik}/${accNoDashes}/`;
               try {
-                const indexRes = await rateLimitedFetch(indexUrl, { headers: { Accept: 'text/html' } });
+                const indexRes = await rateLimitedFetch(indexUrl, {
+                  headers: { 'User-Agent': SEC_USER_AGENT, Accept: 'text/html' },
+                });
                 if (!indexRes.ok) {
                   res.writeHead(indexRes.status, { 'Content-Type': 'application/json' });
                   res.end(JSON.stringify({ error: 'Filing index not found' }));
                   return;
                 }
                 const indexHtml = await indexRes.text();
-                const allLinks = [...indexHtml.matchAll(/<a\s+href="([^"]+\.htm)"[^>]*>([^<]+)<\/a>/gi)];
-                const prospectus = allLinks.find((m) => /424b4/i.test(m[1]) || /424b4/i.test(m[2]));
-                const firstHtm = allLinks.find((m) => !/index\.htm/i.test(m[1]));
-                const docPath = prospectus
-                  ? (prospectus[1].startsWith('http') ? prospectus[1] : new URL(prospectus[1], baseUrl).href)
-                  : firstHtm
-                    ? (firstHtm[1].startsWith('http') ? firstHtm[1] : new URL(firstHtm[1], baseUrl).href)
-                    : null;
+                const linkRegex = /<a\s+href=["']([^"']+\.(?:htm|html))["'][^>]*>([^<]*)<\/a>/gi;
+                const allLinks = [...indexHtml.matchAll(linkRegex)];
+                const htmLinks = allLinks.filter((m) => !/index\.htm|index\.html/i.test(m[1]));
+                const prospectus424 = htmLinks.find((m) => /424b4|424b/i.test(m[1]) || /424b4|424b/i.test(m[2]));
+                const prospectusDesc = htmLinks.find((m) => /prospectus|424b|s-1\.htm|f-1\.htm/i.test(m[2]));
+                const first = prospectus424 ?? prospectusDesc ?? htmLinks[0];
+                let docPath = first
+                  ? (first[1].startsWith('http') ? first[1] : new URL(first[1].trim(), baseUrl).href)
+                  : null;
                 if (!docPath) {
-                  res.writeHead(404, { 'Content-Type': 'application/json' });
-                  res.end(JSON.stringify({ error: 'Prospectus not found' }));
-                  return;
+                  docPath = `https://www.sec.gov/Archives/edgar/data/${cleanCik.replace(/^0+/, '') || cleanCik}/${accNoDashes}/${accession}-index.htm`;
                 }
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ url: docPath }));
@@ -201,7 +202,7 @@ export function secProxyPlugin(): Plugin {
               const baseUrl = `https://www.sec.gov/Archives/edgar/data/${cleanCik.replace(/^0+/, '') || cleanCik}/${accNoDashes}/`;
               try {
                 const indexRes = await rateLimitedFetch(indexUrl, {
-                  headers: { Accept: 'text/html' },
+                  headers: { 'User-Agent': SEC_USER_AGENT, Accept: 'text/html' },
                 });
                 if (!indexRes.ok) {
                   res.writeHead(indexRes.status, { 'Content-Type': 'application/json' });
@@ -209,20 +210,23 @@ export function secProxyPlugin(): Plugin {
                   return;
                 }
                 const indexHtml = await indexRes.text();
-                const allLinks = [...indexHtml.matchAll(/<a\s+href="([^"]+\.htm)"[^>]*>([^<]+)<\/a>/gi)];
-                const prospectus = allLinks.find((m) => /424b4/i.test(m[1]) || /424b4/i.test(m[2]));
-                const firstHtm = allLinks.find((m) => !/index\.htm/i.test(m[1]));
-                const docPath = prospectus
-                  ? (prospectus[1].startsWith('http') ? prospectus[1] : new URL(prospectus[1], baseUrl).href)
-                  : firstHtm
-                    ? (firstHtm[1].startsWith('http') ? firstHtm[1] : new URL(firstHtm[1], baseUrl).href)
-                    : null;
+                const linkRegex = /<a\s+href=["']([^"']+\.(?:htm|html))["'][^>]*>([^<]*)<\/a>/gi;
+                const allLinks = [...indexHtml.matchAll(linkRegex)];
+                const htmLinks = allLinks.filter((m) => !/index\.htm|index\.html/i.test(m[1]));
+                const prospectus424 = htmLinks.find((m) => /424b4|424b/i.test(m[1]) || /424b4|424b/i.test(m[2]));
+                const prospectusDesc = htmLinks.find((m) => /prospectus|424b|s-1\.htm|f-1\.htm/i.test(m[2]));
+                const first = prospectus424 ?? prospectusDesc ?? htmLinks[0];
+                const docPath = first
+                  ? (first[1].startsWith('http') ? first[1] : new URL(first[1].trim(), baseUrl).href)
+                  : null;
                 if (!docPath) {
                   res.writeHead(404, { 'Content-Type': 'application/json' });
-                  res.end(JSON.stringify({ error: 'Prospectus not found' }));
+                  res.end(JSON.stringify({ error: 'Prospectus document not found in filing' }));
                   return;
                 }
-                const docRes = await rateLimitedFetch(docPath, { headers: { Accept: 'text/html' } });
+                const docRes = await rateLimitedFetch(docPath, {
+                  headers: { 'User-Agent': SEC_USER_AGENT, Accept: 'text/html' },
+                });
                 const html = await docRes.text();
                 res.writeHead(200, {
                   'Content-Type': 'text/html',

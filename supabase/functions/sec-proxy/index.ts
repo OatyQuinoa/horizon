@@ -5,7 +5,7 @@
  * Deploy: supabase functions deploy sec-proxy
  * Then: VITE_SEC_PROXY_URL=https://<project-ref>.supabase.co/functions/v1/sec-proxy
  */
-const SEC_USER_AGENT = 'AIIS-InvestmentResearch/1.0 (contact@aiis-research.com)';
+const SEC_USER_AGENT = 'Prospecti-InvestmentResearch/1.0 (contact@prospecti-app.com)';
 
 Deno.serve(async (req: Request) => {
   if (req.method !== 'GET') {

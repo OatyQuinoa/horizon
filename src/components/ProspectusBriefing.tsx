@@ -1,5 +1,5 @@
 /**
- * Prospectus Briefing — Verifiable extraction from SEC filings.
+ * Prospectus — Verifiable extraction from SEC filings.
  * Every insight anchored to verbatim quotations. No external facts or inferred intent.
  */
 import { useState } from 'react';
@@ -73,7 +73,7 @@ export default function ProspectusBriefingCard({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Prospectus-Brief-${companyName.replace(/\s+/g, '-')}-${briefing.accessionNumber}.html`;
+    a.download = `Prospectus-${companyName.replace(/\s+/g, '-')}-${briefing.accessionNumber}.html`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -83,7 +83,7 @@ export default function ProspectusBriefingCard({
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
           <FileText className="w-4 h-4" />
-          Prospectus Brief
+          Prospectus
         </h3>
         {!briefing ? (
           <Button onClick={generateBriefing} disabled={isLoading} size="sm">
@@ -240,7 +240,7 @@ function renderBriefingHtml(b: ProspectusBriefing): string {
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Prospectus Brief — ${escapeHtml(b.companyName)}</title>
+  <title>Prospectus — ${escapeHtml(b.companyName)}</title>
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1.5rem; color: #1a1a1a; line-height: 1.6; }
     h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
@@ -256,7 +256,7 @@ function renderBriefingHtml(b: ProspectusBriefing): string {
   </style>
 </head>
 <body>
-  <h1>Prospectus Brief</h1>
+  <h1>Prospectus</h1>
   <p class="meta">${escapeHtml(b.companyName)} · CIK ${b.cik} · ${b.formType} · Accession ${b.accessionNumber}</p>
   <p class="meta" style="font-size:0.85rem;margin-top:0.25rem;">
     S-1 Filing: ${b.filingDates?.s1FilingDate ? formatFilingDate(b.filingDates.s1FilingDate) : '—'} ·

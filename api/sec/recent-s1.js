@@ -2,7 +2,7 @@
  * Vercel serverless: proxy SEC browse-edgar Atom feed for recent S-1/S-1A, return JSON.
  * GET /api/sec/recent-s1?count=80
  */
-const SEC_USER_AGENT = 'AIIS-InvestmentResearch/1.0 (contact@aiis-research.com)';
+const SEC_USER_AGENT = 'Prospecti-InvestmentResearch/1.0 (contact@prospecti-app.com)';
 
 function parseSecAtomFeed(xml) {
   const filings = [];

@@ -3,7 +3,7 @@
  * 424B4 is filed after pricing, right around the actual IPO — canonical "IPO happened" signal.
  * GET /api/sec/recent-424b4?count=80
  */
-const SEC_USER_AGENT = 'AIIS-InvestmentResearch/1.0 (contact@aiis-research.com)';
+const SEC_USER_AGENT = 'Prospecti-InvestmentResearch/1.0 (contact@prospecti-app.com)';
 
 function parseSecAtomFeed(xml, formLabel) {
   const filings = [];

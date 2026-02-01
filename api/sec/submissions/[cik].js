@@ -2,7 +2,7 @@
  * Vercel serverless: proxy SEC company submissions (SIC, tickers, name).
  * GET /api/sec/submissions/CIK0001318605 (or CIK1318605)
  */
-const SEC_USER_AGENT = 'AIIS-InvestmentResearch/1.0 (contact@aiis-research.com)';
+const SEC_USER_AGENT = 'Prospecti-InvestmentResearch/1.0 (contact@prospecti-app.com)';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {

@@ -10,7 +10,7 @@
 
 // SEC API Configuration
 const SEC_CONFIG = {
-  userAgent: 'AIIS-InvestmentResearch/1.0 (research@aiis-demo.com)',
+  userAgent: 'Prospecti-InvestmentResearch/1.0 (research@prospecti-app.com)',
   rateLimit: 100, // ms between requests
   baseUrls: {
     submissions: 'https://data.sec.gov/submissions',

@@ -3,26 +3,29 @@ import { useParams, Link } from 'react-router-dom';
 
 function ViewProspectusLink({ cik, accessionNumber }: { cik: string; accessionNumber: string }) {
   const [url, setUrl] = useState<string | null>(null);
+  const cleanCik = String(cik).replace(/\D/g, '').replace(/^0+/, '') || cik;
+  const accNoDashes = accessionNumber.replace(/-/g, '');
+  const fallbackIndexUrl = `https://www.sec.gov/Archives/edgar/data/${cleanCik}/${accNoDashes}/${accessionNumber}-index.htm`;
   useEffect(() => {
     let cancelled = false;
     fetch(`/api/sec/prospectus-url?cik=${encodeURIComponent(cik)}&accession=${encodeURIComponent(accessionNumber)}`)
-      .then((r) => r.ok ? r.json() : null)
+      .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (!cancelled && data?.url) setUrl(data.url);
       })
       .catch(() => {});
     return () => { cancelled = true; };
   }, [cik, accessionNumber]);
-  if (!url) return null;
+  const displayUrl = url ?? fallbackIndexUrl;
   return (
     <a
-      href={url}
+      href={displayUrl}
       target="_blank"
       rel="noopener noreferrer"
       className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
     >
       <FileText className="w-4 h-4" />
-      View Prospectus Brief
+      View Prospectus on SEC.gov
       <ExternalLink className="w-3 h-3" />
     </a>
   );
@@ -213,7 +216,11 @@ export default function CompanyDetail() {
                     })
                   : '—'}
               </p>
-              <p className="text-[10px] text-muted-foreground/70 mt-0.5">Initial registration submitted</p>
+              <p className="text-[10px] text-muted-foreground/70 mt-0.5">
+                {(company.filingDates?.s1FilingDate || (company.ipoStatus === 'pipeline' ? company.filingDate : null))
+                  ? 'Initial registration submitted'
+                  : 'Not available for this filing'}
+              </p>
             </div>
             <div>
               <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Registration Date</p>
@@ -226,7 +233,11 @@ export default function CompanyDetail() {
                     })
                   : '—'}
               </p>
-              <p className="text-[10px] text-muted-foreground/70 mt-0.5">SEC declared effective</p>
+              <p className="text-[10px] text-muted-foreground/70 mt-0.5">
+                {company.filingDates?.registrationDate
+                  ? 'SEC declared effective'
+                  : 'Not available from SEC metadata'}
+              </p>
             </div>
             <div>
               <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Prospectus Filing Date (424B4)</p>
