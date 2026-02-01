@@ -205,17 +205,41 @@ export default function CompanyDetail() {
             <div>
               <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">S-1 Filing Date</p>
               <p className="font-mono text-sm text-foreground">
-                {company.filingDate
-                  ? new Date(company.filingDate).toLocaleDateString('en-US', {
+                {(company.filingDates?.s1FilingDate || (company.ipoStatus === 'pipeline' ? company.filingDate : null))
+                  ? new Date(company.filingDates?.s1FilingDate ?? company.filingDate).toLocaleDateString('en-US', {
                       year: 'numeric',
                       month: 'short',
                       day: 'numeric',
                     })
                   : '—'}
               </p>
-              <p className="text-[10px] text-muted-foreground/70 mt-0.5">
-                Registration date, not IPO/offer date
+              <p className="text-[10px] text-muted-foreground/70 mt-0.5">Initial registration submitted</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Registration Date</p>
+              <p className="font-mono text-sm text-foreground">
+                {company.filingDates?.registrationDate
+                  ? new Date(company.filingDates.registrationDate).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                    })
+                  : '—'}
               </p>
+              <p className="text-[10px] text-muted-foreground/70 mt-0.5">SEC declared effective</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Prospectus Filing Date (424B4)</p>
+              <p className="font-mono text-sm text-foreground">
+                {(company.filingDates?.prospectusFilingDate || (company.ipoStatus === 'completed' ? company.filingDate : null))
+                  ? new Date(company.filingDates?.prospectusFilingDate ?? company.filingDate).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                    })
+                  : '—'}
+              </p>
+              <p className="text-[10px] text-muted-foreground/70 mt-0.5">Final prospectus; offering priced</p>
             </div>
             {company.accessionNumber && (
               <div>
@@ -254,6 +278,7 @@ export default function CompanyDetail() {
                 accessionNumber={company.accessionNumber}
                 filingDate={company.filingDate}
                 formType={company.ipoStatus === 'completed' ? '424B4' : 'S-1'}
+                filingDates={company.filingDates}
                 onError={(msg) => toast.error(msg)}
               />
               </>

@@ -39,6 +39,8 @@ export interface ProspectusBriefing {
   overview: string;
   summary: string;
   offeringDetails: OfferingDetails;
+  /** Distinct dates: S-1 (intent), registration (effective), prospectus (424B4) */
+  filingDates?: { s1FilingDate?: string; registrationDate?: string; prospectusFilingDate?: string };
   sections: BriefingSection[];
   metrics: BriefingMetrics;
 }
@@ -266,7 +268,15 @@ function deriveObservation(
 
 export function analyzeProspectus(
   html: string,
-  meta: { companyName: string; cik: string; accessionNumber: string; filingDate: string; formType: string; prospectusUrl?: string }
+  meta: {
+    companyName: string;
+    cik: string;
+    accessionNumber: string;
+    filingDate: string;
+    formType: string;
+    prospectusUrl?: string;
+    filingDates?: { s1FilingDate?: string; registrationDate?: string; prospectusFilingDate?: string };
+  }
 ): ProspectusBriefing {
   const rawText = stripHtml(html);
   const text = stripBoilerplate(rawText);

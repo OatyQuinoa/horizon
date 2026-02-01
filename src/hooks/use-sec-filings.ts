@@ -84,6 +84,12 @@ export function useSecFilings(
           ticker: '',
           sector: softwareOnly ? 'Technology' : '—',
           filingDate: filing.filingDate,
+          filingDates:
+            filing.ipoStatus === 'completed'
+              ? { prospectusFilingDate: filing.filingDate?.slice(0, 10) }
+              : filing.ipoStatus === 'pipeline'
+                ? { s1FilingDate: filing.filingDate?.slice(0, 10) }
+                : undefined,
           accessionNumber: filing.accessionNumber,
           s1Link: filing.secIndexUrl,
           ipoStatus: filing.ipoStatus,

@@ -240,6 +240,11 @@ export interface SecCompany {
   ticker: string;
   sector: string;
   filingDate: string;
+  filingDates?: {
+    s1FilingDate?: string;
+    registrationDate?: string;
+    prospectusFilingDate?: string;
+  };
   s1Link: string;
   accessionNumber: string;
   sicCode?: string;
@@ -274,6 +279,25 @@ export async function fetchCompanyById(id: string): Promise<SecCompany | null> {
     const filingDate = filingDates[idx] ?? '';
     const accFromApi = accNums[idx] ?? accessionNumber;
     const formFromApi = forms[idx] ?? 'S-1';
+
+    const filingDatesOut: SecCompany['filingDates'] = {};
+    let s1Earliest: string | null = null;
+    let prospectusLatest: string | null = null;
+    for (let i = 0; i < (forms?.length ?? 0); i++) {
+      const f = String(forms[i] ?? '').toUpperCase();
+      const d = (filingDates[i] ?? '').slice(0, 10);
+      if (!d) continue;
+      if (f === 'S-1' || f === 'S-1/A') {
+        if (!s1Earliest || d < s1Earliest) s1Earliest = d;
+      }
+      if (f === '424B4') {
+        if (!prospectusLatest || d > prospectusLatest) prospectusLatest = d;
+      }
+    }
+    if (s1Earliest) filingDatesOut.s1FilingDate = s1Earliest;
+    if (prospectusLatest) filingDatesOut.prospectusFilingDate = prospectusLatest;
+    if (formFromApi === '424B4') filingDatesOut.prospectusFilingDate = filingDate.slice(0, 10);
+
     return {
       id,
       cik: padded,
@@ -281,6 +305,7 @@ export async function fetchCompanyById(id: string): Promise<SecCompany | null> {
       ticker: tickers[0] ?? '',
       sector: sicDescription ?? '—',
       filingDate,
+      filingDates: Object.keys(filingDatesOut).length > 0 ? filingDatesOut : undefined,
       s1Link: constructCompanySearchUrl(padded, formFromApi),
       accessionNumber: accFromApi,
       sicCode: sic != null ? String(sic) : undefined,

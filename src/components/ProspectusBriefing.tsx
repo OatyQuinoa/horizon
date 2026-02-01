@@ -14,6 +14,7 @@ interface ProspectusBriefingProps {
   accessionNumber: string;
   filingDate: string;
   formType?: string;
+  filingDates?: { s1FilingDate?: string; registrationDate?: string; prospectusFilingDate?: string };
   onError?: (msg: string) => void;
 }
 
@@ -23,6 +24,7 @@ export default function ProspectusBriefingCard({
   accessionNumber,
   filingDate,
   formType = '424B4',
+  filingDates,
   onError,
 }: ProspectusBriefingProps) {
   const [briefing, setBriefing] = useState<ProspectusBriefing | null>(null);
@@ -53,6 +55,7 @@ export default function ProspectusBriefingCard({
         filingDate,
         formType,
         prospectusUrl,
+        filingDates,
       });
       setBriefing(b);
     } catch (e) {
@@ -254,7 +257,12 @@ function renderBriefingHtml(b: ProspectusBriefing): string {
 </head>
 <body>
   <h1>Prospectus Brief</h1>
-  <p class="meta">${escapeHtml(b.companyName)} · CIK ${b.cik} · ${b.formType} · Accession ${b.accessionNumber} · Filed ${formatFilingDate(b.filingDate)}</p>
+  <p class="meta">${escapeHtml(b.companyName)} · CIK ${b.cik} · ${b.formType} · Accession ${b.accessionNumber}</p>
+  <p class="meta" style="font-size:0.85rem;margin-top:0.25rem;">
+    S-1 Filing: ${b.filingDates?.s1FilingDate ? formatFilingDate(b.filingDates.s1FilingDate) : '—'} ·
+    Registration: ${b.filingDates?.registrationDate ? formatFilingDate(b.filingDates.registrationDate) : '—'} ·
+    Prospectus (424B4): ${(b.filingDates?.prospectusFilingDate || (b.formType === '424B4' ? b.filingDate : '')) ? formatFilingDate(b.filingDates?.prospectusFilingDate ?? b.filingDate) : '—'}
+  </p>
   ${prospectusLinkHtml}
   <p class="meta">Generated ${new Date(b.generatedAt).toLocaleString()} · All excerpts verbatim from the filing.</p>
 

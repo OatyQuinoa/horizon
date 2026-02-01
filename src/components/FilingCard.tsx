@@ -47,9 +47,20 @@ export default function FilingCard({ company }: FilingCardProps) {
         </div>
         
         <div className="flex items-center gap-4 text-xs sm:text-sm text-muted-foreground">
-          <div className="flex items-center gap-1.5" title="S-1 filing date (registration, not IPO date)">
+          <div
+            className="flex items-center gap-1.5"
+            title={
+              company.ipoStatus === 'completed'
+                ? 'Prospectus (424B4) filing date — offering priced'
+                : 'S-1 filing date — IPO intent'
+            }
+          >
             <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span>S-1 filed {formatFilingDate(company.filingDate)}</span>
+            <span>
+              {company.ipoStatus === 'completed'
+                ? `Prospectus filed ${formatFilingDate(company.filingDate)}`
+                : `S-1 filed ${formatFilingDate(company.filingDate)}`}
+            </span>
           </div>
           <div className="flex items-center gap-1 text-primary/70">
             <FileText className="w-3 h-3" />
