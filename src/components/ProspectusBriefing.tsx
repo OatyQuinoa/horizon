@@ -116,6 +116,19 @@ export default function ProspectusBriefingCard({
             </a>
           )}
           <p className="text-muted-foreground text-xs leading-relaxed">{briefing.overview}</p>
+          {(briefing.offeringDetails?.sharesOffered || briefing.offeringDetails?.pricePerShare) && (
+            <div>
+              <h4 className="font-medium text-foreground mb-1 text-sm">Offering Details</h4>
+              <div className="text-muted-foreground text-xs space-y-0.5">
+                {briefing.offeringDetails.sharesOffered && (
+                  <p>Shares/units offered: <span className="font-mono">{briefing.offeringDetails.sharesOffered}</span></p>
+                )}
+                {briefing.offeringDetails.pricePerShare && (
+                  <p>Price per share: <span className="font-mono">{briefing.offeringDetails.pricePerShare}</span></p>
+                )}
+              </div>
+            </div>
+          )}
           {briefing.summary && (
             <div>
               <h4 className="font-medium text-foreground mb-1 text-sm">Prospectus Summary</h4>
@@ -246,6 +259,13 @@ function renderBriefingHtml(b: ProspectusBriefing): string {
   <p class="meta">Generated ${new Date(b.generatedAt).toLocaleString()} · All excerpts verbatim from the filing.</p>
 
   <p class="overview">${escapeHtml(b.overview)}</p>
+  ${(b.offeringDetails?.sharesOffered || b.offeringDetails?.pricePerShare) ? `
+  <h2>Offering Details</h2>
+  <ul>
+    ${b.offeringDetails?.sharesOffered ? `<li>Shares/units offered: <strong>${escapeHtml(b.offeringDetails.sharesOffered)}</strong></li>` : ''}
+    ${b.offeringDetails?.pricePerShare ? `<li>Price per share: <strong>${escapeHtml(b.offeringDetails.pricePerShare)}</strong></li>` : ''}
+  </ul>
+  ` : ''}
   ${b.summary ? `
   <h2>Prospectus Summary</h2>
   <blockquote>${escapeHtml(b.summary)}</blockquote>

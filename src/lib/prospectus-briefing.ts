@@ -23,6 +23,11 @@ export interface BriefingMetrics {
   notablyUnderdeveloped: Array<{ section: string; note: string }>;
 }
 
+export interface OfferingDetails {
+  sharesOffered?: string;
+  pricePerShare?: string;
+}
+
 export interface ProspectusBriefing {
   companyName: string;
   cik: string;
@@ -33,6 +38,7 @@ export interface ProspectusBriefing {
   generatedAt: string;
   overview: string;
   summary: string;
+  offeringDetails: OfferingDetails;
   sections: BriefingSection[];
   metrics: BriefingMetrics;
 }
@@ -156,6 +162,42 @@ function extractSections(text: string): Array<{ name: string; content: string; s
   }
 
   return sections;
+}
+
+function extractOfferingDetails(text: string): OfferingDetails {
+  const details: OfferingDetails = {};
+  const coverArea = text.slice(0, 10000);
+
+  const sharesPatterns = [
+    /(\d[\d,]*(?:\s*(?:million|billion))?)\s*(?:shares|units)\s*(?:of\s+(?:common|class\s+a|class\s+ordinary))?/i,
+    /(\d[\d,]*)\s*(?:shares|units)\s*(?:of\s+)/i,
+    /(\d[\d,]*(?:\s*million|\s*billion)?)\s*(?:shares|units)\b/i,
+    /\$\s*[\d,]+\s+[A-Za-z\s]+\s+(\d[\d,]*(?:\s*million|\s*billion)?)\s*(?:shares|units)/i,
+  ];
+  for (const re of sharesPatterns) {
+    const m = coverArea.match(re);
+    if (m) {
+      const raw = m[1].trim();
+      details.sharesOffered = raw.replace(/\s+/g, ' ');
+      break;
+    }
+  }
+
+  const pricePatterns = [
+    /\$\s*[\d,]+(?:\.\d{2})?\s*per\s+(?:share|unit|class\s+a\s+share)/i,
+    /(?:public\s+offering\s+price|offering\s+price|price)\s*(?:of\s+)?\$\s*[\d,]+(?:\.\d{2})?/i,
+    /at\s+(?:a\s+)?price\s+of\s+\$\s*[\d,]+(?:\.\d{2})?/i,
+    /\$\s*[\d,]+(?:\.\d{2})?\s*per\s+(?:share|unit)/i,
+  ];
+  for (const re of pricePatterns) {
+    const m = coverArea.match(re);
+    if (m) {
+      details.pricePerShare = m[0].replace(/\s+/g, ' ').trim();
+      break;
+    }
+  }
+
+  return details;
 }
 
 function extractSubstantiveExcerpt(content: string, maxLen: number = 280): string {
@@ -310,12 +352,15 @@ export function analyzeProspectus(
       ? extractSubstantiveExcerpt(sections[0].content, 400)
       : '';
 
+  const offeringDetails = extractOfferingDetails(rawText);
+
   return {
     ...meta,
     prospectusUrl: meta.prospectusUrl ?? '',
     generatedAt: new Date().toISOString(),
     overview,
     summary,
+    offeringDetails,
     sections: briefingSections,
     metrics: {
       conditionalPhrases: [...conditionalCounts.entries()]

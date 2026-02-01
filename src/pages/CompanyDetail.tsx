@@ -22,7 +22,7 @@ function ViewProspectusLink({ cik, accessionNumber }: { cik: string; accessionNu
       className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
     >
       <FileText className="w-4 h-4" />
-      View Prospectus Briefing
+      View Prospectus Brief
       <ExternalLink className="w-3 h-3" />
     </a>
   );
@@ -231,19 +231,23 @@ export default function CompanyDetail() {
             )}
           </div>
           <div className="mt-4 pt-4 border-t border-border space-y-4">
-            <a
-              href={company.s1Link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
-            >
-              <FileText className="w-4 h-4" />
-              View Full Filing on SEC EDGAR
-              <ExternalLink className="w-3 h-3" />
-            </a>
+            <div className="flex flex-col gap-2">
+              <a
+                href={company.s1Link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
+              >
+                <FileText className="w-4 h-4" />
+                View Full Filing on SEC EDGAR
+                <ExternalLink className="w-3 h-3" />
+              </a>
+              {company.accessionNumber && company.cik && (
+                <ViewProspectusLink cik={company.cik} accessionNumber={company.accessionNumber} />
+              )}
+            </div>
             {company.accessionNumber && company.cik && (
               <>
-                <ViewProspectusLink cik={company.cik} accessionNumber={company.accessionNumber} />
                 <ProspectusBriefingCard
                 companyName={company.name}
                 cik={company.cik}
