@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { mockCompanies, mockMetrics } from '@/data/mockData';
 import MetricCard from '@/components/MetricCard';
@@ -7,16 +7,45 @@ import { toast } from 'sonner';
 import { Textarea } from '@/components/ui/textarea';
 import { motion } from 'framer-motion';
 import { formatLargeNumber, formatPercentage } from '@/lib/sec-api';
+import { useCompaniesOptional } from '@/context/CompaniesContext';
+import { fetchCompanyById } from '@/lib/sec-filing-service';
+import { Company } from '@/types';
+import LoadingSpinner from '@/components/LoadingSpinner';
 
 export default function CompanyDetail() {
   const { id } = useParams<{ id: string }>();
-  const company = mockCompanies.find(c => c.id === id);
-  
+  const ctx = useCompaniesOptional();
+  const fromContext = ctx?.secFilings?.find((c) => c.id === id);
+  const fromMock = mockCompanies.find((c) => c.id === id);
+  const [fetchedSec, setFetchedSec] = useState<Company | null>(null);
+  const [isFetching, setIsFetching] = useState(false);
+
+  const company = fromContext ?? fromMock ?? fetchedSec;
+
+  useEffect(() => {
+    if (id && !fromContext && !fromMock && /^\d{10}-[\d-]+$/.test(id)) {
+      setIsFetching(true);
+      fetchCompanyById(id)
+        .then((sec) => {
+          if (sec) setFetchedSec(sec as unknown as Company);
+        })
+        .finally(() => setIsFetching(false));
+    }
+  }, [id, fromContext, fromMock]);
+
   const [isEditingThesis, setIsEditingThesis] = useState(false);
   const [isEditingConcerns, setIsEditingConcerns] = useState(false);
   const [thesis, setThesis] = useState(company?.thesis || '');
   const [concerns, setConcerns] = useState(company?.concerns || '');
   const [onWatchlist, setOnWatchlist] = useState(company?.onWatchlist || false);
+
+  if (isFetching) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <LoadingSpinner />
+      </div>
+    );
+  }
 
   if (!company) {
     return (
@@ -127,13 +156,18 @@ export default function CompanyDetail() {
         <div className="bg-card/30 border border-border rounded-lg p-5 sm:p-6">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
             <div>
-              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Filing Date</p>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">S-1 Filing Date</p>
               <p className="font-mono text-sm text-foreground">
-                {new Date(company.filingDate).toLocaleDateString('en-US', { 
-                  year: 'numeric', 
-                  month: 'short', 
-                  day: 'numeric' 
-                })}
+                {company.filingDate
+                  ? new Date(company.filingDate).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                    })
+                  : '—'}
+              </p>
+              <p className="text-[10px] text-muted-foreground/70 mt-0.5">
+                Registration date, not IPO/offer date
               </p>
             </div>
             {company.accessionNumber && (

@@ -1,7 +1,7 @@
 import { Company } from '@/types';
 import { Calendar, FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { format } from 'date-fns';
+import { formatFilingDate } from '@/lib/sec-filing-service';
 
 interface FilingCardProps {
   company: Company;
@@ -35,9 +35,9 @@ export default function FilingCard({ company }: FilingCardProps) {
         </div>
         
         <div className="flex items-center gap-4 text-xs sm:text-sm text-muted-foreground">
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5" title="S-1 filing date (registration, not IPO date)">
             <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            <span>Filed {format(new Date(company.filingDate), 'MMM d, yyyy')}</span>
+            <span>S-1 filed {formatFilingDate(company.filingDate)}</span>
           </div>
           <div className="flex items-center gap-1 text-primary/70">
             <FileText className="w-3 h-3" />

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { mockCompanies } from '@/data/mockData';
 import FeaturedCompanyCard from '@/components/FeaturedCompanyCard';
+import { useCompaniesOptional } from '@/context/CompaniesContext';
 import FilingCard from '@/components/FilingCard';
 import { motion } from 'framer-motion';
 import { useSecFilings, getDataSourceLabel } from '@/hooks/use-sec-filings';
@@ -38,6 +39,11 @@ export default function Dashboard() {
     daysBack,
     softwareOnly
   );
+  const setSecFilings = useCompaniesOptional()?.setSecFilings;
+
+  useEffect(() => {
+    setSecFilings?.(filings);
+  }, [filings, setSecFilings]);
 
   const recentFilings = filings.slice(0, 6);
   // Featured: first filing when we have live SEC data; otherwise first mock featured for hero only

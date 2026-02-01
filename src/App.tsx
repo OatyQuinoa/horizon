@@ -7,10 +7,11 @@ import Archive from "./pages/Archive";
 import CompanyDetail from "./pages/CompanyDetail";
 import LoadingSpinner from "./components/LoadingSpinner";
 import { Toaster } from "./components/ui/sonner";
+import { CompaniesProvider } from "./context/CompaniesContext";
 
 function App() {
   return (
-    <>
+    <CompaniesProvider>
       <Suspense fallback={<LoadingSpinner />}>
         <Layout>
           <Routes>
@@ -22,7 +23,7 @@ function App() {
         </Layout>
       </Suspense>
       <Toaster position="top-right" />
-    </>
+    </CompaniesProvider>
   );
 }
 

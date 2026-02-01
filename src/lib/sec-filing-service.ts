@@ -163,6 +163,78 @@ async function fetchViaRecentS1(): Promise<RecentFiling[]> {
 // ---------------------------------------------------------------------------
 
 /**
+ * Parse SEC-style id (e.g. "0001843724-0001193125-23-219891") into cik and optional accession.
+ */
+function parseSecId(id: string): { cik: string; accessionNumber: string } | null {
+  const parts = id.split('-');
+  if (parts.length < 2) return null;
+  const first = parts[0];
+  if (!/^\d{10}$/.test(first)) return null;
+  return {
+    cik: first,
+    accessionNumber: parts.slice(1).join('-'),
+  };
+}
+
+/** Company-like object built from SEC data (for detail page when not in mock) */
+export interface SecCompany {
+  id: string;
+  cik: string;
+  name: string;
+  ticker: string;
+  sector: string;
+  filingDate: string;
+  s1Link: string;
+  accessionNumber: string;
+  sicCode?: string;
+  sicDescription?: string;
+}
+
+/**
+ * Fetch full company data from SEC by id (cik-accession format).
+ * Returns company with the actual filing date from the submissions API.
+ */
+export async function fetchCompanyById(id: string): Promise<SecCompany | null> {
+  const parsed = parseSecId(id);
+  if (!parsed) return null;
+  const { cik, accessionNumber } = parsed;
+  const padded = padCik(cik);
+  const url = `${API_BASE}/api/sec/submissions/CIK${padded}`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const name = data?.name ?? 'Unknown';
+    const sic = data?.sic ?? null;
+    const sicDescription = data?.sicDescription ?? null;
+    const tickers = Array.isArray(data?.tickers) ? data.tickers : [];
+    const accNums = data?.filings?.recent?.accessionNumber ?? [];
+    const forms = data?.filings?.recent?.form ?? [];
+    const filingDates = data?.filings?.recent?.filingDate ?? [];
+    const accNorm = accessionNumber.replace(/-/g, '');
+    let idx = accNums.findIndex((a: string) => (a || '') === accessionNumber);
+    if (idx < 0) idx = accNums.findIndex((a: string) => (a || '').replace(/-/g, '') === accNorm);
+    if (idx < 0) return null;
+    const filingDate = filingDates[idx] ?? '';
+    const accFromApi = accNums[idx] ?? accessionNumber;
+    return {
+      id,
+      cik: padded,
+      name,
+      ticker: tickers[0] ?? '',
+      sector: sicDescription ?? '—',
+      filingDate,
+      s1Link: constructCompanySearchUrl(padded, 'S-1'),
+      accessionNumber: accFromApi,
+      sicCode: sic != null ? String(sic) : undefined,
+      sicDescription: sicDescription != null ? String(sicDescription) : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Fetch company data from SEC submissions API via proxy. Used for SIC filtering and display.
  */
 export async function fetchCompanyByCik(cik: string): Promise<CompanyEnrichment | null> {
