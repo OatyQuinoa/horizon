@@ -180,7 +180,10 @@ export function secProxyPlugin(): Plugin {
                 }
                 const docRes = await rateLimitedFetch(docPath, { headers: { Accept: 'text/html' } });
                 const html = await docRes.text();
-                res.writeHead(200, { 'Content-Type': 'text/html' });
+                res.writeHead(200, {
+                  'Content-Type': 'text/html',
+                  'X-Prospectus-Url': docPath,
+                });
                 res.end(html);
                 return;
               } catch (err) {

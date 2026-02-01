@@ -44,6 +44,7 @@ export default function ProspectusBriefingCard({
         throw new Error(err.error || `Fetch failed: ${res.status}`);
       }
       const html = await res.text();
+      const prospectusUrl = res.headers.get('X-Prospectus-Url') ?? '';
       const { analyzeProspectus } = await import('@/lib/prospectus-briefing');
       const b = analyzeProspectus(html, {
         companyName,
@@ -51,6 +52,7 @@ export default function ProspectusBriefingCard({
         accessionNumber,
         filingDate,
         formType,
+        prospectusUrl,
       });
       setBriefing(b);
     } catch (e) {
@@ -68,7 +70,7 @@ export default function ProspectusBriefingCard({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Prospectus-Briefing-${companyName.replace(/\s+/g, '-')}-${briefing.accessionNumber}.html`;
+    a.download = `Prospectus-Brief-${companyName.replace(/\s+/g, '-')}-${briefing.accessionNumber}.html`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -78,7 +80,7 @@ export default function ProspectusBriefingCard({
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
           <FileText className="w-4 h-4" />
-          Prospectus Briefing
+          Prospectus Brief
         </h3>
         {!briefing ? (
           <Button onClick={generateBriefing} disabled={isLoading} size="sm">
@@ -99,19 +101,29 @@ export default function ProspectusBriefingCard({
         )}
       </div>
       <p className="text-xs text-muted-foreground">
-        Extracts linguistic patterns from the prospectus. Every insight is anchored to verbatim quotations from the filing.
+        Single-page summary with verbatim citations. Link to source, key excerpts, and supporting language metrics.
       </p>
       {briefing && (
         <div className="border border-border rounded-lg p-5 bg-card/30 space-y-4 text-sm">
-          <p className="text-muted-foreground text-xs leading-relaxed">{briefing.summary}</p>
+          {briefing.prospectusUrl && (
+            <a
+              href={briefing.prospectusUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-primary hover:underline text-xs font-medium"
+            >
+              View prospectus on SEC.gov ↗
+            </a>
+          )}
+          <p className="text-muted-foreground text-xs leading-relaxed">{briefing.overview}</p>
           <div className="grid grid-cols-2 gap-4 text-xs">
             <div>
-              <span className="text-muted-foreground">Conditional / Definitive ratio:</span>{' '}
-              {briefing.metrics.conditionalRatio.toFixed(2)}
+              <span className="text-muted-foreground">Language (supporting):</span>{' '}
+              Ratio {briefing.metrics.conditionalRatio.toFixed(2)}
             </div>
             <div>
-              <span className="text-muted-foreground">Conditional phrases:</span>{' '}
-              {briefing.metrics.conditionalTotal} (e.g. “may”, “expect”)
+              <span className="text-muted-foreground">Hedging phrases:</span>{' '}
+              {briefing.metrics.conditionalTotal}
             </div>
           </div>
           {briefing.sections.slice(0, 4).map((sec, i) => (
@@ -159,6 +171,10 @@ function escapeHtml(s: string): string {
 }
 
 function renderBriefingHtml(b: ProspectusBriefing): string {
+  const prospectusLinkHtml = b.prospectusUrl
+    ? `<p class="meta"><a href="${escapeHtml(b.prospectusUrl)}" target="_blank" rel="noopener">View prospectus on SEC.gov</a></p>`
+    : '';
+
   const sectionsHtml = b.sections
     .map(
       (sec) =>
@@ -184,8 +200,8 @@ function renderBriefingHtml(b: ProspectusBriefing): string {
   </ul>`
       : '';
 
-  const metricsHtml = `
-  <h3>Linguistic metrics</h3>
+  const languageHtml = `
+  <h3>Language & structure (supporting)</h3>
   <ul>
     <li>Conditional phrases (may, intend, expect): ${b.metrics.conditionalTotal}</li>
     <li>Definitive phrases (have, do, generate): ${b.metrics.definitiveTotal}</li>
@@ -202,33 +218,35 @@ function renderBriefingHtml(b: ProspectusBriefing): string {
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Prospectus Briefing — ${escapeHtml(b.companyName)}</title>
+  <title>Prospectus Brief — ${escapeHtml(b.companyName)}</title>
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1.5rem; color: #1a1a1a; line-height: 1.6; }
     h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
     h2 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #666; margin-top: 2rem; margin-bottom: 0.5rem; }
     h3 { font-size: 1rem; margin-top: 1.5rem; margin-bottom: 0.5rem; }
-    .summary { color: #444; font-size: 0.95rem; margin: 1rem 0; }
+    .overview { color: #444; font-size: 0.95rem; margin: 1rem 0; }
+    .meta { font-size: 0.8rem; color: #666; margin-bottom: 0.5rem; }
+    .meta a { color: #0066cc; }
     blockquote { margin: 0.5rem 0; padding-left: 1rem; border-left: 3px solid #ccc; color: #444; font-style: italic; }
     .observation { font-size: 0.9rem; color: #555; margin-top: 0.25rem; }
     ul { margin: 0.5rem 0; padding-left: 1.5rem; }
-    .meta { font-size: 0.8rem; color: #666; margin-bottom: 2rem; }
     .disclaimer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid #ddd; font-size: 0.75rem; color: #888; }
   </style>
 </head>
 <body>
-  <h1>Prospectus Briefing</h1>
+  <h1>Prospectus Brief</h1>
   <p class="meta">${escapeHtml(b.companyName)} · CIK ${b.cik} · ${b.formType} · Accession ${b.accessionNumber} · Filed ${formatFilingDate(b.filingDate)}</p>
+  ${prospectusLinkHtml}
   <p class="meta">Generated ${new Date(b.generatedAt).toLocaleString()} · All excerpts verbatim from the filing.</p>
 
-  <p class="summary">${escapeHtml(b.summary)}</p>
+  <p class="overview">${escapeHtml(b.overview)}</p>
 
-  <h2>Excerpts by section</h2>
-  <p style="font-size:0.9rem;color:#666;">Each quote is paired with a mechanically derived observation—patterns, unusual emphasis, or omissions—tethered to the text.</p>
+  <h2>Key excerpts</h2>
+  <p style="font-size:0.9rem;color:#666;">Verbatim citations with concise observations. Source text visible as evidence.</p>
   ${sectionsHtml}
 
-  <h2>Metrics</h2>
-  ${metricsHtml}
+  <h2>Supporting metrics</h2>
+  ${languageHtml}
 
   <p class="disclaimer">This document introduces no analysis beyond the filing itself. All quoted material is extracted verbatim from the Prospectus. No external facts or inferred intent have been added.</p>
 </body>

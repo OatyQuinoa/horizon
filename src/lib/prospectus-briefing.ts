@@ -29,8 +29,9 @@ export interface ProspectusBriefing {
   accessionNumber: string;
   filingDate: string;
   formType: string;
+  prospectusUrl: string;
   generatedAt: string;
-  summary: string;
+  overview: string;
   sections: BriefingSection[];
   metrics: BriefingMetrics;
 }
@@ -222,7 +223,7 @@ function deriveObservation(
 
 export function analyzeProspectus(
   html: string,
-  meta: { companyName: string; cik: string; accessionNumber: string; filingDate: string; formType: string }
+  meta: { companyName: string; cik: string; accessionNumber: string; filingDate: string; formType: string; prospectusUrl?: string }
 ): ProspectusBriefing {
   const rawText = stripHtml(html);
   const text = stripBoilerplate(rawText);
@@ -266,8 +267,18 @@ export function analyzeProspectus(
     }
   }
 
+  const priorityOrder = ['Use of Proceeds', 'Risk Factors', 'Prospectus Summary', 'Offering', 'Our Business', 'Underwriting', 'Capitalization', 'Dilution'];
+  const sortByRelevance = (a: { name: string }, b: { name: string }) => {
+    const ai = priorityOrder.findIndex((p) => a.name.includes(p) || p.includes(a.name));
+    const bi = priorityOrder.findIndex((p) => b.name.includes(p) || p.includes(b.name));
+    if (ai >= 0 && bi >= 0) return ai - bi;
+    if (ai >= 0) return -1;
+    if (bi >= 0) return 1;
+    return 0;
+  };
+  const sortedSections = [...sections].sort(sortByRelevance);
   const briefingSections: BriefingSection[] = [];
-  for (const sec of sections.slice(0, 10)) {
+  for (const sec of sortedSections.slice(0, 8)) {
     const excerpt = extractSubstantiveExcerpt(sec.content, 280);
     if (!excerpt) continue;
     const observation = deriveObservation(sec.name, sec.content, excerpt, sections);
@@ -277,12 +288,26 @@ export function analyzeProspectus(
     });
   }
 
-  const summary = `This briefing extracts verbatim passages from the Prospectus filed by ${meta.companyName} (CIK ${meta.cik}, Accession ${meta.accessionNumber}). Conditional phrasing (may, expect, intend) appears ${conditionalTotal} times; definitive phrasing (have, do, generate) appears ${definitiveTotal} times—a ratio of ${ratio.toFixed(2)}. Each section below pairs a direct quote with mechanically derived observations.`;
+  const summarySec = sections.find((s) =>
+    /summary|prospectus summary|offering/i.test(s.name)
+  );
+  const offeringMatch = rawText.match(/\$\s*[\d,]+(?:\s*million|\s*billion)?/i);
+  const offeringSize = offeringMatch ? offeringMatch[0] : '';
+  const overviewParts: string[] = [];
+  if (offeringSize) overviewParts.push(`This ${meta.formType} prospectus describes an offering of approximately ${offeringSize}.`);
+  const firstSentence = summarySec
+    ? extractSubstantiveExcerpt(summarySec.content, 180)
+    : '';
+  if (firstSentence) overviewParts.push(firstSentence);
+  overviewParts.push(`Key excerpts below are verbatim from the filing.`);
+
+  const overview = overviewParts.join(' ').trim() || `This prospectus filing by ${meta.companyName} contains the offering terms, use of proceeds, risk factors, and related disclosures. Key excerpts below are verbatim from the filing.`;
 
   return {
     ...meta,
+    prospectusUrl: meta.prospectusUrl ?? '',
     generatedAt: new Date().toISOString(),
-    summary,
+    overview,
     sections: briefingSections,
     metrics: {
       conditionalPhrases: [...conditionalCounts.entries()]
