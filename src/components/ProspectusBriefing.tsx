@@ -103,6 +103,7 @@ export default function ProspectusBriefingCard({
       </p>
       {briefing && (
         <div className="border border-border rounded-lg p-5 bg-card/30 space-y-4 text-sm">
+          <p className="text-muted-foreground text-xs leading-relaxed">{briefing.summary}</p>
           <div className="grid grid-cols-2 gap-4 text-xs">
             <div>
               <span className="text-muted-foreground">Conditional / Definitive ratio:</span>{' '}
@@ -113,22 +114,29 @@ export default function ProspectusBriefingCard({
               {briefing.metrics.conditionalTotal} (e.g. “may”, “expect”)
             </div>
           </div>
-          {briefing.sections.slice(0, 3).map((sec, i) => (
+          {briefing.sections.slice(0, 4).map((sec, i) => (
             <div key={i}>
               <h4 className="font-medium text-foreground mb-1">{sec.heading}</h4>
               {sec.excerpts.slice(0, 1).map((ex, j) => (
-                <blockquote key={j} className="pl-3 border-l-2 border-muted text-muted-foreground italic">
-                  "{ex.quote}"
-                </blockquote>
+                <div key={j}>
+                  <blockquote className="pl-3 border-l-2 border-muted text-muted-foreground italic">
+                    &quot;{ex.quote}&quot;
+                  </blockquote>
+                  <p className="text-xs text-muted-foreground mt-1">{ex.observation}</p>
+                </div>
               ))}
             </div>
           ))}
-          {briefing.metrics.minimallyAddressed.length > 0 && (
+          {briefing.metrics.notablyUnderdeveloped.length > 0 && (
             <div>
-              <h4 className="font-medium text-foreground mb-1">Minimally addressed</h4>
-              <p className="text-muted-foreground text-xs">
-                {briefing.metrics.minimallyAddressed.join(', ')}
-              </p>
+              <h4 className="font-medium text-foreground mb-1">Notably Underdeveloped</h4>
+              <ul className="text-xs text-muted-foreground space-y-0.5">
+                {briefing.metrics.notablyUnderdeveloped.map((u, i) => (
+                  <li key={i}>
+                    <span className="font-medium">{u.section}</span>: {u.note}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
           <Button onClick={downloadBriefing} size="sm" variant="ghost" className="mt-2">
@@ -141,22 +149,40 @@ export default function ProspectusBriefingCard({
   );
 }
 
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function renderBriefingHtml(b: ProspectusBriefing): string {
   const sectionsHtml = b.sections
     .map(
       (sec) =>
         `<section>
-  <h3>${sec.heading}</h3>
+  <h3>${escapeHtml(sec.heading)}</h3>
   ${sec.excerpts
     .map(
       (ex) =>
-        `<blockquote>"${ex.quote.replace(/"/g, '&quot;')}"</blockquote>
-  <p class="observation">${ex.observation}</p>`
+        `<blockquote>"${escapeHtml(ex.quote)}"</blockquote>
+  <p class="observation">${escapeHtml(ex.observation)}</p>`
     )
     .join('\n  ')}
 </section>`
     )
     .join('\n');
+
+  const underdevelopedHtml =
+    b.metrics.notablyUnderdeveloped.length > 0
+      ? `
+  <h3>Notably Underdeveloped</h3>
+  <ul>
+    ${b.metrics.notablyUnderdeveloped.map((u) => `<li><strong>${escapeHtml(u.section)}</strong>: ${escapeHtml(u.note)}</li>`).join('\n    ')}
+  </ul>`
+      : '';
 
   const metricsHtml = `
   <h3>Linguistic metrics</h3>
@@ -167,21 +193,22 @@ function renderBriefingHtml(b: ProspectusBriefing): string {
   </ul>
   <h3>Section length (words)</h3>
   <ul>
-    ${b.metrics.sectionWordCounts.map((s) => `<li>${s.name}: ${s.words}${s.note ? ` — ${s.note}` : ''}</li>`).join('\n    ')}
+    ${b.metrics.sectionWordCounts.map((s) => `<li>${escapeHtml(s.name)}: ${s.words}${s.note ? ` — ${escapeHtml(s.note)}` : ''}</li>`).join('\n    ')}
   </ul>
-  ${b.metrics.minimallyAddressed.length > 0 ? `<p><strong>Minimally addressed or absent:</strong> ${b.metrics.minimallyAddressed.join(', ')}</p>` : ''}
+  ${underdevelopedHtml}
 `;
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Prospectus Briefing — ${b.companyName}</title>
+  <title>Prospectus Briefing — ${escapeHtml(b.companyName)}</title>
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1.5rem; color: #1a1a1a; line-height: 1.6; }
     h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
     h2 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #666; margin-top: 2rem; margin-bottom: 0.5rem; }
     h3 { font-size: 1rem; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+    .summary { color: #444; font-size: 0.95rem; margin: 1rem 0; }
     blockquote { margin: 0.5rem 0; padding-left: 1rem; border-left: 3px solid #ccc; color: #444; font-style: italic; }
     .observation { font-size: 0.9rem; color: #555; margin-top: 0.25rem; }
     ul { margin: 0.5rem 0; padding-left: 1.5rem; }
@@ -191,16 +218,19 @@ function renderBriefingHtml(b: ProspectusBriefing): string {
 </head>
 <body>
   <h1>Prospectus Briefing</h1>
-  <p class="meta">${b.companyName} · CIK ${b.cik} · ${b.formType} · Accession ${b.accessionNumber} · Filed ${formatFilingDate(b.filingDate)}</p>
+  <p class="meta">${escapeHtml(b.companyName)} · CIK ${b.cik} · ${b.formType} · Accession ${b.accessionNumber} · Filed ${formatFilingDate(b.filingDate)}</p>
   <p class="meta">Generated ${new Date(b.generatedAt).toLocaleString()} · All excerpts verbatim from the filing.</p>
 
+  <p class="summary">${escapeHtml(b.summary)}</p>
+
   <h2>Excerpts by section</h2>
+  <p style="font-size:0.9rem;color:#666;">Each quote is paired with a mechanically derived observation—patterns, unusual emphasis, or omissions—tethered to the text.</p>
   ${sectionsHtml}
 
   <h2>Metrics</h2>
   ${metricsHtml}
 
-  <p class="disclaimer">This document introduces no analysis beyond the filing itself. All quoted material is extracted verbatim. No external facts or inferred intent have been added.</p>
+  <p class="disclaimer">This document introduces no analysis beyond the filing itself. All quoted material is extracted verbatim from the Prospectus. No external facts or inferred intent have been added.</p>
 </body>
 </html>`;
 }
