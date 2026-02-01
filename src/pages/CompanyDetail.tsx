@@ -1,5 +1,32 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+
+function ViewProspectusLink({ cik, accessionNumber }: { cik: string; accessionNumber: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/sec/prospectus-url?cik=${encodeURIComponent(cik)}&accession=${encodeURIComponent(accessionNumber)}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!cancelled && data?.url) setUrl(data.url);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [cik, accessionNumber]);
+  if (!url) return null;
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
+    >
+      <FileText className="w-4 h-4" />
+      View Prospectus Briefing
+      <ExternalLink className="w-3 h-3" />
+    </a>
+  );
+}
 import { mockCompanies, mockMetrics } from '@/data/mockData';
 import MetricCard from '@/components/MetricCard';
 import { ArrowLeft, ExternalLink, Edit2, Save, X, Star, FileText, Building2 } from 'lucide-react';
@@ -215,7 +242,9 @@ export default function CompanyDetail() {
               <ExternalLink className="w-3 h-3" />
             </a>
             {company.accessionNumber && company.cik && (
-              <ProspectusBriefingCard
+              <>
+                <ViewProspectusLink cik={company.cik} accessionNumber={company.accessionNumber} />
+                <ProspectusBriefingCard
                 companyName={company.name}
                 cik={company.cik}
                 accessionNumber={company.accessionNumber}
@@ -223,6 +252,7 @@ export default function CompanyDetail() {
                 formType={company.ipoStatus === 'completed' ? '424B4' : 'S-1'}
                 onError={(msg) => toast.error(msg)}
               />
+              </>
             )}
           </div>
         </div>

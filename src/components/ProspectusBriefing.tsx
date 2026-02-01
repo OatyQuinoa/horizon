@@ -116,6 +116,12 @@ export default function ProspectusBriefingCard({
             </a>
           )}
           <p className="text-muted-foreground text-xs leading-relaxed">{briefing.overview}</p>
+          {briefing.summary && (
+            <div>
+              <h4 className="font-medium text-foreground mb-1 text-sm">Prospectus Summary</h4>
+              <p className="text-muted-foreground text-xs leading-relaxed italic">&quot;{briefing.summary}&quot;</p>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-4 text-xs">
             <div>
               <span className="text-muted-foreground">Language (supporting):</span>{' '}
@@ -240,7 +246,10 @@ function renderBriefingHtml(b: ProspectusBriefing): string {
   <p class="meta">Generated ${new Date(b.generatedAt).toLocaleString()} · All excerpts verbatim from the filing.</p>
 
   <p class="overview">${escapeHtml(b.overview)}</p>
-
+  ${b.summary ? `
+  <h2>Prospectus Summary</h2>
+  <blockquote>${escapeHtml(b.summary)}</blockquote>
+  ` : ''}
   <h2>Key excerpts</h2>
   <p style="font-size:0.9rem;color:#666;">Verbatim citations with concise observations. Source text visible as evidence.</p>
   ${sectionsHtml}

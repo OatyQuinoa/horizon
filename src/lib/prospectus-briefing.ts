@@ -32,6 +32,7 @@ export interface ProspectusBriefing {
   prospectusUrl: string;
   generatedAt: string;
   overview: string;
+  summary: string;
   sections: BriefingSection[];
   metrics: BriefingMetrics;
 }
@@ -303,11 +304,18 @@ export function analyzeProspectus(
 
   const overview = overviewParts.join(' ').trim() || `This prospectus filing by ${meta.companyName} contains the offering terms, use of proceeds, risk factors, and related disclosures. Key excerpts below are verbatim from the filing.`;
 
+  const summary = summarySec
+    ? extractSubstantiveExcerpt(summarySec.content, 500)
+    : sections[0]
+      ? extractSubstantiveExcerpt(sections[0].content, 400)
+      : '';
+
   return {
     ...meta,
     prospectusUrl: meta.prospectusUrl ?? '',
     generatedAt: new Date().toISOString(),
     overview,
+    summary,
     sections: briefingSections,
     metrics: {
       conditionalPhrases: [...conditionalCounts.entries()]
