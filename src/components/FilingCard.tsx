@@ -36,8 +36,11 @@ export default function FilingCard({ company }: FilingCardProps) {
               {company.ipoStatus === 'completed' ? 'IPO Priced' : 'Pipeline'}
             </span>
           )}
-          <span className="text-xs px-2.5 sm:px-3 py-1 bg-muted/30 rounded-full text-muted-foreground uppercase tracking-wide">
-            {company.sector}
+          <span
+            className="text-xs px-2.5 sm:px-3 py-1 bg-muted/30 rounded-full text-muted-foreground uppercase tracking-wide max-w-[140px] truncate"
+            title={company.sicDescription ?? company.sector}
+          >
+            {company.sector || company.sicDescription || '—'}
           </span>
           {company.sicCode && (
             <span className="text-xs px-2 py-0.5 bg-muted/20 rounded text-muted-foreground/70 font-mono">

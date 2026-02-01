@@ -21,23 +21,37 @@ const TIME_FRAME_OPTIONS = [
   { value: '14', label: 'Last 14 days', days: 14 },
   { value: '30', label: 'Last 30 days', days: 30 },
   { value: '60', label: 'Last 60 days', days: 60 },
+  { value: '90', label: 'Last 90 days', days: 90 },
+  { value: '180', label: 'Last 6 months', days: 180 },
+  { value: '365', label: 'Last 12 months', days: 365 },
 ] as const;
 
 const SECTOR_OPTIONS = [
-  { value: 'all', label: 'All sectors', softwareOnly: false },
-  { value: 'software', label: 'Software only (SIC 7370–7379)', softwareOnly: true },
+  { value: 'all', label: 'All sectors' },
+  { value: 'software', label: 'Technology / Software' },
+  { value: 'healthcare', label: 'Healthcare' },
+  { value: 'financial', label: 'Financial' },
+  { value: 'consumer', label: 'Consumer' },
+  { value: 'industrial', label: 'Industrial' },
+  { value: 'energy', label: 'Energy' },
+  { value: 'realestate', label: 'Real Estate' },
+  { value: 'communications', label: 'Communications' },
+  { value: 'services', label: 'Services' },
+  { value: 'other', label: 'Other' },
 ] as const;
+
+const INITIAL_VISIBLE = 12;
+const LOAD_MORE_COUNT = 12;
 
 export default function Dashboard() {
   const [timeFrame, setTimeFrame] = useState<string>('30');
   const [sectorFilter, setSectorFilter] = useState<string>('all');
 
   const daysBack = TIME_FRAME_OPTIONS.find((o) => o.value === timeFrame)?.days ?? 30;
-  const softwareOnly = SECTOR_OPTIONS.find((o) => o.value === sectorFilter)?.softwareOnly ?? false;
 
   const { filings, isLoading, error, lastUpdated, refetch, dataSource } = useSecFilings(
     daysBack,
-    softwareOnly
+    sectorFilter
   );
   const setSecFilings = useCompaniesOptional()?.setSecFilings;
 
@@ -45,7 +59,13 @@ export default function Dashboard() {
     setSecFilings?.(filings);
   }, [filings, setSecFilings]);
 
-  const recentFilings = filings.slice(0, 6);
+  useEffect(() => {
+    setVisibleCount(INITIAL_VISIBLE);
+  }, [sectorFilter, timeFrame]);
+
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
+  const recentFilings = filings.slice(0, visibleCount);
+  const hasMore = filings.length > visibleCount;
   // Featured: first filing when we have live SEC data; otherwise first mock featured for hero only
   const featuredFromSec = filings[0];
   const featuredCompany = featuredFromSec ?? mockCompanies.find((c) => c.featured);
@@ -161,7 +181,7 @@ export default function Dashboard() {
         {!isLoading && recentFilings.length === 0 && (
           <div className="rounded-lg border border-border bg-card/30 px-4 py-8 text-center text-sm text-muted-foreground">
             {dataSource === 'sec-api'
-              ? `No S-1 filings in the selected time frame (last ${daysBack} days${softwareOnly ? ', software only' : ''}).`
+              ? `No S-1 filings in the selected time frame (last ${daysBack} days${sectorFilter !== 'all' ? `, ${SECTOR_OPTIONS.find((o) => o.value === sectorFilter)?.label ?? sectorFilter}` : ''}).`
               : 'No recent filings to show. Start the dev server (npm run dev) or production server (npm run start) to load live SEC data.'}
           </div>
         )}
@@ -179,6 +199,17 @@ export default function Dashboard() {
             </motion.div>
           ))}
         </div>
+
+        {hasMore && (
+          <div className="flex justify-center pt-4">
+            <button
+              onClick={() => setVisibleCount((c) => Math.min(c + LOAD_MORE_COUNT, filings.length))}
+              className="text-sm font-medium text-primary hover:text-primary/80 px-4 py-2 rounded-lg border border-border hover:bg-card/50 transition-colors"
+            >
+              Load more ({filings.length - visibleCount} remaining)
+            </button>
+          </div>
+        )}
       </section>
 
       {/* Quick Stats Section */}
@@ -190,7 +221,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
           <div className="bg-card/30 border border-border rounded-lg p-5 sm:p-6">
             <p className="text-xs sm:text-sm text-muted-foreground mb-2">New Filings</p>
-            <p className="text-3xl sm:text-4xl font-mono font-semibold text-foreground">6</p>
+            <p className="text-3xl sm:text-4xl font-mono font-semibold text-foreground">{filings.length}</p>
           </div>
           <div className="bg-card/30 border border-border rounded-lg p-5 sm:p-6">
             <p className="text-xs sm:text-sm text-muted-foreground mb-2">Watchlist</p>

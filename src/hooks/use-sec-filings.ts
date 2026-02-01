@@ -14,10 +14,57 @@ import {
   RecentFiling,
   fetchRecentS1Filings,
   fetchCompanyByCik,
-  isSoftwareCompany,
   formatFilingDate,
   getRelativeDate,
 } from '@/lib/sec-filing-service';
+
+/** SIC code range predicates for sector filtering */
+function sicMatchesSector(sic: string | null | undefined, sector: string): boolean {
+  if (!sic) return sector === 'all' || sector === 'other';
+  const n = parseInt(sic.slice(0, 4), 10);
+  if (isNaN(n)) return sector === 'all' || sector === 'other';
+  if (sector === 'all') return true;
+  const inNamedSector =
+    (n >= 7370 && n <= 7379) ||
+    ((n >= 8000 && n <= 8099) || (n >= 3840 && n <= 3859)) ||
+    (n >= 6000 && n <= 6999) ||
+    (n >= 5200 && n <= 5999) ||
+    ((n >= 3500 && n <= 3999) || (n >= 2500 && n <= 2599)) ||
+    ((n >= 1300 && n <= 1399) || (n >= 2900 && n <= 2999) || (n >= 1200 && n <= 1299)) ||
+    (n >= 6500 && n <= 6599) ||
+    (n >= 4800 && n <= 4899) ||
+    (n >= 7000 && n <= 7999);
+  if (sector === 'other') return !inNamedSector;
+  switch (sector) {
+    case 'software':
+      return n >= 7370 && n <= 7379;
+    case 'healthcare':
+      return (n >= 8000 && n <= 8099) || (n >= 3840 && n <= 3859);
+    case 'financial':
+      return n >= 6000 && n <= 6999;
+    case 'consumer':
+      return n >= 5200 && n <= 5999;
+    case 'industrial':
+      return (n >= 3500 && n <= 3999) || (n >= 2500 && n <= 2599);
+    case 'energy':
+      return (n >= 1300 && n <= 1399) || (n >= 2900 && n <= 2999) || (n >= 1200 && n <= 1299);
+    case 'realestate':
+      return n >= 6500 && n <= 6599;
+    case 'communications':
+      return n >= 4800 && n <= 4899;
+    case 'services':
+      return n >= 7000 && n <= 7999 && (n < 7370 || n > 7379);
+    default:
+      return true;
+  }
+}
+
+/** Map sicDescription to short sector label for display */
+function sectorLabel(sicDescription: string | null | undefined): string {
+  if (!sicDescription || sicDescription === '—') return '—';
+  if (sicDescription.length > 24) return sicDescription.slice(0, 21) + '…';
+  return sicDescription;
+}
 
 interface UseSecFilingsResult {
   filings: Company[];
@@ -32,12 +79,12 @@ interface UseSecFilingsResult {
 /**
  * Hook to fetch and manage SEC filing data
  *
- * @param daysBack - Number of days to look back for filings (default: 30, within a month)
- * @param softwareOnly - Whether to filter only software/tech companies (used when enriching; all S-1 returned from SEC)
+ * @param daysBack - Number of days to look back for filings (default: 30)
+ * @param sectorFilter - Sector filter: 'all' | 'software' | 'healthcare' | 'financial' | etc.
  */
 export function useSecFilings(
   daysBack: number = 30,
-  softwareOnly: boolean = true
+  sectorFilter: string = 'all'
 ): UseSecFilingsResult {
   const [filings, setFilings] = useState<Company[]>([]);
   const [recentFilings, setRecentFilings] = useState<RecentFiling[]>([]);
@@ -51,38 +98,42 @@ export function useSecFilings(
     setIsLoading(true);
     setError(null);
     setDataSource('loading');
-    console.log(`${LOG} useSecFilings: fetching (daysBack=${daysBack}, softwareOnly=${softwareOnly})`);
+    console.log(`${LOG} useSecFilings: fetching (daysBack=${daysBack}, sectorFilter=${sectorFilter})`);
 
     try {
-      // Try to fetch from SEC API via proxy
       let secFilings = await fetchRecentS1Filings(daysBack);
       console.log(`${LOG} useSecFilings: SEC returned ${secFilings.length} filings`);
 
       if (secFilings.length > 0) {
-        // Optionally filter to software/tech only (SIC 7370-7379) via Submissions API
-        if (softwareOnly) {
-          const filtered: RecentFiling[] = [];
-          for (let i = 0; i < secFilings.length; i++) {
-            const company = await fetchCompanyByCik(secFilings[i].cik);
-            if (company?.sicCode && isSoftwareCompany(company.sicCode)) {
-              filtered.push(secFilings[i]);
-            }
-            if (i < secFilings.length - 1) {
-              await new Promise((r) => setTimeout(r, 160));
-            }
+        const filterBySector = sectorFilter !== 'all';
+        const enriched: Array<RecentFiling & { sicCode?: string; sicDescription?: string }> = [];
+
+        for (let i = 0; i < secFilings.length; i++) {
+          const company = await fetchCompanyByCik(secFilings[i].cik);
+          const sicCode = company?.sicCode ?? undefined;
+          const sicDescription = company?.sicDescription ?? undefined;
+
+          if (filterBySector && !sicMatchesSector(sicCode ?? null, sectorFilter)) continue;
+          enriched.push({ ...secFilings[i], sicCode, sicDescription });
+
+          if (i < secFilings.length - 1) {
+            await new Promise((r) => setTimeout(r, 160));
           }
-          secFilings = filtered;
-          console.log(`${LOG} useSecFilings: after software filter: ${secFilings.length} filings`);
         }
 
-        setRecentFilings(secFilings);
+        if (filterBySector) {
+          console.log(`${LOG} useSecFilings: after sector filter: ${enriched.length} filings`);
+        }
+        setRecentFilings(enriched);
 
-        const convertedFilings: Company[] = secFilings.map((filing) => ({
+        const convertedFilings: Company[] = enriched.map((filing) => ({
           id: filing.id,
           cik: filing.cik,
           name: filing.companyName,
           ticker: '',
-          sector: softwareOnly ? 'Technology' : '—',
+          sector: filing.sicDescription ? sectorLabel(filing.sicDescription) : (sectorFilter === 'software' ? 'Technology' : '—'),
+          sicCode: filing.sicCode,
+          sicDescription: filing.sicDescription,
           filingDate: filing.filingDate,
           filingDates:
             filing.ipoStatus === 'completed'
@@ -120,7 +171,7 @@ export function useSecFilings(
     } finally {
       setIsLoading(false);
     }
-  }, [daysBack, softwareOnly]);
+  }, [daysBack, sectorFilter]);
 
   useEffect(() => {
     fetchFilings();
