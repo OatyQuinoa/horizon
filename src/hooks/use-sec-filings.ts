@@ -76,22 +76,30 @@ interface UseSecFilingsResult {
   dataSource: 'sec-api' | 'curated' | 'loading';
 }
 
+export interface UseSecFilingsOptions {
+  /** When true, skip fetching on mount (e.g. use cached data from context). Refetch still works. */
+  skipInitialFetch?: boolean;
+}
+
 /**
  * Hook to fetch and manage SEC filing data
  *
  * @param daysBack - Number of days to look back for filings (default: 30)
  * @param sectorFilter - Sector filter: 'all' | 'software' | 'healthcare' | 'financial' | etc.
+ * @param options - Optional: skipInitialFetch to use cached data and avoid refetch on mount
  */
 export function useSecFilings(
   daysBack: number = 30,
-  sectorFilter: string = 'all'
+  sectorFilter: string = 'all',
+  options?: UseSecFilingsOptions
 ): UseSecFilingsResult {
+  const skipInitialFetch = options?.skipInitialFetch ?? false;
   const [filings, setFilings] = useState<Company[]>([]);
   const [recentFilings, setRecentFilings] = useState<RecentFiling[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!skipInitialFetch);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [dataSource, setDataSource] = useState<'sec-api' | 'curated' | 'loading'>('loading');
+  const [dataSource, setDataSource] = useState<'sec-api' | 'curated' | 'loading'>(skipInitialFetch ? 'sec-api' : 'loading');
 
   const fetchFilings = useCallback(async () => {
     const LOG = '[SEC IPO]';
@@ -174,8 +182,9 @@ export function useSecFilings(
   }, [daysBack, sectorFilter]);
 
   useEffect(() => {
+    if (skipInitialFetch) return;
     fetchFilings();
-  }, [fetchFilings]);
+  }, [fetchFilings, skipInitialFetch]);
 
   return {
     filings,
