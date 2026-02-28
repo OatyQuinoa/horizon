@@ -1,6 +1,6 @@
 # Debugging Prospectus URL Resolution
 
-When "View Prospectus on SEC.gov" redirects to `https://www.sec.gov/search-filings` instead of the actual filing, use this guide to diagnose and fix.
+When "View Prospectus" redirects to `https://www.sec.gov/search-filings` instead of the actual filing, use this guide to diagnose and fix.
 
 ## Quick Debug
 

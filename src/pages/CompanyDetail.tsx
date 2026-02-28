@@ -41,7 +41,7 @@ function ViewProspectusLink({
       className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
     >
       <FileText className="w-4 h-4" />
-      View Prospectus on SEC.gov
+      View Prospectus
       <ExternalLink className="w-3 h-3" />
     </a>
   );
@@ -299,7 +299,7 @@ export default function CompanyDetail() {
                 className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
               >
                 <FileText className="w-4 h-4" />
-                View Full Filing on SEC EDGAR
+                View Full Filing
                 <ExternalLink className="w-3 h-3" />
               </a>
               {company.accessionNumber && company.cik && (
@@ -308,6 +308,18 @@ export default function CompanyDetail() {
                   accessionNumber={company.accessionNumber}
                   primaryDocument={company.primaryDocument}
                 />
+              )}
+              {company.accessionNumber && company.cik && (
+                <a
+                  href={`https://www.sec.gov/Archives/edgar/data/${String(company.cik).replace(/\D/g, '').replace(/^0+/, '') || company.cik}/${company.accessionNumber.replace(/-/g, '')}/`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
+                >
+                  <FileText className="w-4 h-4" />
+                  View Directory
+                  <ExternalLink className="w-3 h-3" />
+                </a>
               )}
             </div>
             {company.accessionNumber && company.cik && (
