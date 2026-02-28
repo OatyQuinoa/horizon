@@ -4,6 +4,19 @@ import { useSecFilings } from '@/hooks/use-sec-filings';
 
 export type SecDataSource = 'sec-api' | 'curated' | 'loading';
 
+/** Dashboard filter state: persisted across navigation (e.g. when returning from company detail). */
+export interface DashboardFilters {
+  timeFrame: string;
+  sectorFilter: string;
+  filingTypeFilter: string;
+}
+
+const DEFAULT_FILTERS: DashboardFilters = {
+  timeFrame: 'month',
+  sectorFilter: 'all',
+  filingTypeFilter: 'all',
+};
+
 interface CompaniesContextValue {
   secFilings: Company[];
   setSecFilings: (filings: Company[]) => void;
@@ -12,6 +25,9 @@ interface CompaniesContextValue {
   dataSource: SecDataSource;
   lastUpdated: Date | null;
   refetch: () => Promise<void>;
+  /** Saved dashboard filters (time frame, sector, filing type). Persist when navigating away and back. */
+  dashboardFilters: DashboardFilters;
+  setDashboardFilters: (filters: Partial<DashboardFilters>) => void;
 }
 
 const CompaniesContext = createContext<CompaniesContextValue | null>(null);
@@ -65,10 +81,15 @@ export function CompaniesProvider({ children }: { children: ReactNode }) {
   const [error, setErrorState] = useState<string | null>(null);
   const [dataSource, setDataSourceState] = useState<SecDataSource>('loading');
   const [lastUpdated, setLastUpdatedState] = useState<Date | null>(null);
+  const [dashboardFilters, setDashboardFiltersState] = useState<DashboardFilters>(DEFAULT_FILTERS);
   const refetchRef = useRef<(() => Promise<void>) | undefined>();
 
   const setSecFilings = useCallback((filings: Company[]) => {
     setSecFilingsState(filings);
+  }, []);
+
+  const setDashboardFilters = useCallback((updates: Partial<DashboardFilters>) => {
+    setDashboardFiltersState((prev) => ({ ...prev, ...updates }));
   }, []);
 
   const refetch = useCallback(() => {
@@ -85,6 +106,8 @@ export function CompaniesProvider({ children }: { children: ReactNode }) {
         dataSource,
         lastUpdated,
         refetch,
+        dashboardFilters,
+        setDashboardFilters,
       }}
     >
       <SecFilingsLoader

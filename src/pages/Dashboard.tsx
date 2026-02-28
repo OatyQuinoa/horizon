@@ -45,18 +45,18 @@ const INITIAL_VISIBLE = 12;
 const LOAD_MORE_COUNT = 12;
 
 export default function Dashboard() {
-  const [timeFrame, setTimeFrame] = useState<string>('month');
-  const [sectorFilter, setSectorFilter] = useState<string>('all');
-  const [filingTypeFilter, setFilingTypeFilter] = useState<FilingTypeFilter>('all');
-
-  const daysBack = TIME_FRAME_OPTIONS.find((o) => o.value === timeFrame)?.days ?? 30;
-
   const ctx = useCompaniesOptional();
   const secFilings = ctx?.secFilings ?? [];
   const isLoading = ctx?.isLoading ?? false;
   const error = ctx?.error ?? null;
   const dataSource = ctx?.dataSource ?? 'loading';
   const refetch = ctx?.refetch ?? (() => Promise.resolve());
+  const dashboardFilters = ctx?.dashboardFilters ?? { timeFrame: 'month', sectorFilter: 'all', filingTypeFilter: 'all' };
+  const setDashboardFilters = ctx?.setDashboardFilters ?? (() => {});
+
+  const { timeFrame, sectorFilter, filingTypeFilter } = dashboardFilters;
+
+  const daysBack = TIME_FRAME_OPTIONS.find((o) => o.value === timeFrame)?.days ?? 30;
 
   // Filter cached SEC data by timeframe, sector, and filing type (IPO-priced vs S-1)
   const displayFilings = filterFilingsForDisplay(secFilings, daysBack, sectorFilter, filingTypeFilter);
@@ -140,7 +140,7 @@ export default function Dashboard() {
               <Label htmlFor="time-frame" className="text-xs text-muted-foreground">
                 Time frame
               </Label>
-              <Select value={timeFrame} onValueChange={setTimeFrame}>
+              <Select value={timeFrame} onValueChange={(v) => setDashboardFilters({ timeFrame: v })}>
                 <SelectTrigger id="time-frame" className="h-9 w-full sm:w-[160px]">
                   <SelectValue placeholder="Time frame" />
                 </SelectTrigger>
@@ -157,7 +157,7 @@ export default function Dashboard() {
               <Label htmlFor="sector" className="text-xs text-muted-foreground">
                 Sector
               </Label>
-              <Select value={sectorFilter} onValueChange={setSectorFilter}>
+              <Select value={sectorFilter} onValueChange={(v) => setDashboardFilters({ sectorFilter: v })}>
                 <SelectTrigger id="sector" className="h-9 w-full sm:w-[220px]">
                   <SelectValue placeholder="Sector" />
                 </SelectTrigger>
@@ -174,7 +174,7 @@ export default function Dashboard() {
               <Label htmlFor="filing-type" className="text-xs text-muted-foreground">
                 Filing type
               </Label>
-              <Select value={filingTypeFilter} onValueChange={(v) => setFilingTypeFilter(v as FilingTypeFilter)}>
+              <Select value={filingTypeFilter} onValueChange={(v) => setDashboardFilters({ filingTypeFilter: v })}>
                 <SelectTrigger id="filing-type" className="h-9 w-full sm:w-[200px]">
                   <SelectValue placeholder="Filing type" />
                 </SelectTrigger>
