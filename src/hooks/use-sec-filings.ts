@@ -114,18 +114,22 @@ export function useSecFilings(
 
       if (secFilings.length > 0) {
         const filterBySector = sectorFilter !== 'all';
+        const CONCURRENCY = 6;
         const enriched: Array<RecentFiling & { sicCode?: string; sicDescription?: string }> = [];
 
-        for (let i = 0; i < secFilings.length; i++) {
-          const company = await fetchCompanyByCik(secFilings[i].cik);
-          const sicCode = company?.sicCode ?? undefined;
-          const sicDescription = company?.sicDescription ?? undefined;
-
-          if (filterBySector && !sicMatchesSector(sicCode ?? null, sectorFilter)) continue;
-          enriched.push({ ...secFilings[i], sicCode, sicDescription });
-
-          if (i < secFilings.length - 1) {
-            await new Promise((r) => setTimeout(r, 160));
+        for (let i = 0; i < secFilings.length; i += CONCURRENCY) {
+          const batch = secFilings.slice(i, i + CONCURRENCY);
+          const results = await Promise.all(
+            batch.map(async (filing) => {
+              const company = await fetchCompanyByCik(filing.cik);
+              const sicCode = company?.sicCode ?? undefined;
+              const sicDescription = company?.sicDescription ?? undefined;
+              return { filing, sicCode, sicDescription };
+            })
+          );
+          for (const { filing, sicCode, sicDescription } of results) {
+            if (filterBySector && !sicMatchesSector(sicCode ?? null, sectorFilter)) continue;
+            enriched.push({ ...filing, sicCode, sicDescription });
           }
         }
 
@@ -209,6 +213,24 @@ export function getDataSourceLabel(source: 'sec-api' | 'curated' | 'loading'): s
     case 'loading':
       return 'Loading...';
   }
+}
+
+/** Filter companies by date range and sector for display. Use with cached secFilings from context. */
+export function filterFilingsForDisplay(
+  companies: Company[],
+  daysBack: number,
+  sectorFilter: string
+): Company[] {
+  const to = new Date();
+  const from = new Date(to);
+  from.setDate(from.getDate() - Math.max(1, daysBack));
+  const dateFrom = from.toISOString().slice(0, 10);
+  const dateTo = to.toISOString().slice(0, 10);
+  return companies.filter((c) => {
+    const d = (c.filingDate || '').slice(0, 10);
+    if (d < dateFrom || d > dateTo) return false;
+    return sicMatchesSector(c.sicCode ?? null, sectorFilter);
+  });
 }
 
 export { formatFilingDate, getRelativeDate };

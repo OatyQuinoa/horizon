@@ -4,8 +4,7 @@ import FeaturedCompanyCard from '@/components/FeaturedCompanyCard';
 import { useCompaniesOptional } from '@/context/CompaniesContext';
 import FilingCard from '@/components/FilingCard';
 import { motion } from 'framer-motion';
-import { useSecFilings, getDataSourceLabel } from '@/hooks/use-sec-filings';
-import LoadingSpinner from '@/components/LoadingSpinner';
+import { getDataSourceLabel, filterFilingsForDisplay } from '@/hooks/use-sec-filings';
 import { RefreshCw, Database, Globe, Filter } from 'lucide-react';
 import {
   Select,
@@ -50,20 +49,14 @@ export default function Dashboard() {
   const daysBack = TIME_FRAME_OPTIONS.find((o) => o.value === timeFrame)?.days ?? 30;
 
   const ctx = useCompaniesOptional();
-  const hasCachedFilings = (ctx?.secFilings?.length ?? 0) > 0;
-  const { filings, isLoading, error, lastUpdated, refetch, dataSource } = useSecFilings(
-    daysBack,
-    sectorFilter,
-    { skipInitialFetch: hasCachedFilings }
-  );
-  const setSecFilings = ctx?.setSecFilings;
+  const secFilings = ctx?.secFilings ?? [];
+  const isLoading = ctx?.isLoading ?? false;
+  const error = ctx?.error ?? null;
+  const dataSource = ctx?.dataSource ?? 'loading';
+  const refetch = ctx?.refetch ?? (() => Promise.resolve());
 
-  // Use cached context when returning from detail so we don't refetch; otherwise use hook data
-  const displayFilings = hasCachedFilings ? (ctx!.secFilings) : filings;
-
-  useEffect(() => {
-    setSecFilings?.(filings);
-  }, [filings, setSecFilings]);
+  // Filter cached SEC data by selected time frame and sector (no refetch on navigation or filter change)
+  const displayFilings = filterFilingsForDisplay(secFilings, daysBack, sectorFilter);
 
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE);
