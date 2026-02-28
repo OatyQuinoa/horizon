@@ -1,234 +1,252 @@
 /**
- * Glossary: A guided orientation to the IPO ecosystem.
- * Clear, calm, factual. Understand the structure before evaluating the opportunity.
+ * Glossary: A layered knowledge system. Pocket field manual — not hype, not a compliance dump.
+ * Searchable, calm, disciplined investor's companion.
  */
 
-import { motion } from 'framer-motion';
+import { useState, useMemo } from 'react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
+import { Input } from '@/components/ui/input';
+import {
+  GLOSSARY_TABS,
+  searchEntries,
+  readingMinutes,
+  type GlossaryTabId,
+  type GlossaryEntry,
+} from '@/data/glossaryData';
+import { Search, BookOpen } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-function GlossarySection({
-  title,
-  intro,
-  children,
+const LIFECYCLE_STEPS = [
+  'Private',
+  'S-1 Filed',
+  'SEC Review',
+  'Amendments (S-1/A)',
+  'Roadshow',
+  'Pricing',
+  '424B4 Filed',
+  'Trading Begins',
+  'Lock-Up Expiration',
+  'First 10-Q',
+  'First 10-K',
+];
+
+const FILING_TYPES_TABLE = [
+  { form: 'S-1', purpose: 'Initial registration statement', timing: 'Before SEC review', care: 'Evolving disclosure; use 424B4 for final terms' },
+  { form: 'S-1/A', purpose: 'Amendment to S-1', timing: 'During SEC review', care: 'Refines disclosure; 424B4 remains definitive' },
+  { form: '424B4', purpose: 'Final prospectus', timing: 'After pricing', care: 'Definitive for dilution, use of proceeds, capital structure' },
+  { form: '8-K', purpose: 'Material event', timing: 'Within days of event', care: 'Post-IPO developments appear here first' },
+  { form: '10-Q', purpose: 'Quarterly report', timing: 'After each of Q1–Q3', care: 'Execution and guidance; test of IPO promises' },
+  { form: '10-K', purpose: 'Annual report', timing: 'After fiscal year', care: 'Full audited disclosure; compare to IPO narrative' },
+  { form: 'Form 4', purpose: 'Insider transactions', timing: 'Within days of trade', care: 'Insider buying/selling; alignment' },
+  { form: 'DEF 14A', purpose: 'Proxy statement', timing: 'Before shareholder meetings', care: 'Governance, compensation, proposals' },
+];
+
+function EntryCard({
+  entry,
+  readingMins,
 }: {
-  title: string;
-  intro?: string;
-  children: React.ReactNode;
+  entry: GlossaryEntry;
+  readingMins: number;
 }) {
   return (
-    <section className="space-y-4">
-      <h2
-        className="text-xl sm:text-2xl font-semibold text-foreground border-b border-border pb-2"
-        style={{ fontFamily: "'Fraunces', serif" }}
-      >
-        {title}
-      </h2>
-      {intro && <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">{intro}</p>}
-      <div className="space-y-4">{children}</div>
-    </section>
-  );
-}
-
-function Term({ term, definition }: { term: string; definition: string }) {
-  return (
-    <div className="pl-0 sm:pl-4 border-l-2 border-border/50">
-      <dt className="font-medium text-foreground text-sm sm:text-base">{term}</dt>
-      <dd className="mt-1 text-sm text-muted-foreground leading-relaxed">{definition}</dd>
-    </div>
+    <AccordionItem value={entry.id} className="border-border">
+      <AccordionTrigger className="py-3 text-left font-medium text-foreground hover:no-underline hover:text-foreground/90">
+        {entry.title}
+      </AccordionTrigger>
+      <AccordionContent className="text-muted-foreground">
+        <p className="leading-relaxed text-sm">{entry.content}</p>
+        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border/50 pt-3 text-xs">
+          <span className="text-muted-foreground/80">{readingMins} min read</span>
+          {entry.relatedTerms && entry.relatedTerms.length > 0 && (
+            <>
+              <span className="text-border">·</span>
+              <span className="text-muted-foreground/80">Related: {entry.relatedTerms.join(', ')}</span>
+            </>
+          )}
+        </div>
+      </AccordionContent>
+    </AccordionItem>
   );
 }
 
 export default function Glossary() {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<GlossaryTabId>('overview');
+
+  const searchResults = useMemo(() => searchEntries(searchQuery), [searchQuery]);
+  const resultsByTab = useMemo(() => {
+    const map = new Map<GlossaryTabId, GlossaryEntry[]>();
+    for (const tab of GLOSSARY_TABS) {
+      map.set(tab.id, searchResults.filter((e) => e.tabId === tab.id));
+    }
+    return map;
+  }, [searchResults]);
+
+  const hasSearch = searchQuery.trim().length > 0;
+  const totalMatches = searchResults.length;
+
   return (
-    <div className="max-w-[720px] mx-auto space-y-14">
-      <motion.header
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-        className="space-y-2"
-      >
-        <h1
-          className="text-2xl sm:text-3xl font-bold text-foreground"
-          style={{ fontFamily: "'Fraunces', serif" }}
-        >
-          Glossary
-        </h1>
-        <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
-          A guided orientation to the IPO ecosystem. Understanding the machinery helps you evaluate
-          the opportunity with clarity.
+    <div className="mx-auto max-w-[900px] space-y-6">
+      <header className="space-y-4">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <BookOpen className="h-5 w-5" />
+          <h1
+            className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl"
+            style={{ fontFamily: "'Fraunces', serif" }}
+          >
+            Glossary
+          </h1>
+        </div>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          A disciplined investor’s companion. Understand the structure before evaluating the opportunity.
         </p>
-      </motion.header>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Search glossary…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 bg-muted/30 border-border text-foreground placeholder:text-muted-foreground"
+            aria-label="Search glossary"
+          />
+        </div>
+        {hasSearch && (
+          <p className="text-xs text-muted-foreground">
+            {totalMatches} {totalMatches === 1 ? 'entry' : 'entries'} match
+          </p>
+        )}
+      </header>
 
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.05 }}
-        className="space-y-14"
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => setActiveTab(v as GlossaryTabId)}
+        className="w-full"
       >
-        {/* 1. The IPO Lifecycle */}
-        <GlossarySection
-          title="1. The IPO Lifecycle"
-          intro="Process before paperwork. A private company files an S-1, goes through SEC review and amendments, conducts a roadshow, prices the offering, files the final prospectus (424B4), and begins trading. Later, lock-up expiration can affect supply. Think of it as a timeline, not a regulation manual."
-        >
-          <Term
-            term="IPO (Initial Public Offering)"
-            definition="A company’s first sale of shares to public investors."
-          />
-          <Term
-            term="S-1 Registration Statement"
-            definition="The initial filing that discloses the business, risks, financials, and proposed offering structure. Often amended multiple times during SEC review."
-          />
-          <Term
-            term="S-1/A"
-            definition="An amendment to the S-1 filed during SEC review."
-          />
-          <Term
-            term="Roadshow"
-            definition="Management marketing the offering to institutional investors before pricing."
-          />
-          <Term
-            term="424B4 Final Prospectus"
-            definition="Filed after pricing. Contains final share count, price, underwriting details, and updated financial data."
-          />
-          <Term
-            term="Lock-Up Period"
-            definition="Typically 180 days during which insiders cannot sell shares. Expiration can create supply shocks and volatility."
-          />
-        </GlossarySection>
+        <TabsList className="flex w-full flex-wrap justify-start gap-1 rounded-lg border border-border bg-muted/20 p-1.5 h-auto">
+          {GLOSSARY_TABS.map((tab) => {
+            const count = resultsByTab.get(tab.id)?.length ?? 0;
+            const showTab = !hasSearch || count > 0;
+            if (!showTab) return null;
+            return (
+              <TabsTrigger
+                key={tab.id}
+                value={tab.id}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-xs font-medium data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm",
+                  !hasSearch && "sm:text-sm"
+                )}
+              >
+                {tab.label}
+                {hasSearch && count > 0 && (
+                  <span className="ml-1.5 text-muted-foreground">({count})</span>
+                )}
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
 
-        {/* 2. Filing Types & Why They Matter */}
-        <GlossarySection
-          title="2. Filing Types & Why They Matter"
-          intro="Not just what each filing is—why it matters to a long-term investor. IPO analysis does not stop at listing day."
-        >
-          <Term
-            term="S-1 vs. 424B4"
-            definition="S-1 is evolving disclosure during SEC review. 424B4 is the finalized offering terms and capital structure. If you are analyzing ownership dilution or insider selling, the 424B4 is definitive."
-          />
-          <Term
-            term="8-K"
-            definition="Material event filing. Post-IPO developments often show up here."
-          />
-          <Term
-            term="10-Q / 10-K"
-            definition="Quarterly and annual reports after the IPO. The real test of IPO promises begins here."
-          />
-        </GlossarySection>
+        {GLOSSARY_TABS.map((tab) => {
+          const entries = resultsByTab.get(tab.id) ?? [];
+          const showContent = !hasSearch || entries.length > 0;
+          if (!showContent) return null;
 
-        {/* 3. What to Look For in a Prospectus */}
-        <GlossarySection
-          title="3. What to Look For in a Prospectus"
-          intro="Disciplined evaluation. Pattern recognition, not hype."
-        >
-          <Term
-            term="Revenue Quality"
-            definition="Is revenue recurring? Concentrated? Growing through pricing or volume?"
-          />
-          <Term
-            term="Gross Margin"
-            definition="Does the business improve as it scales?"
-          />
-          <Term
-            term="Net Loss & Burn Rate"
-            definition="How fast is cash being consumed?"
-          />
-          <Term
-            term="Use of Proceeds"
-            definition="Is capital being used to grow, repay debt, or fund operating losses?"
-          />
-          <Term
-            term="Dilution"
-            definition="What percentage of the company is being sold? Who is selling—insiders or the company?"
-          />
-          <Term
-            term="Customer Concentration"
-            definition="Does one client represent a large share of revenue?"
-          />
-          <Term
-            term="Risk Factors"
-            definition="Are risks generic boilerplate or highly specific to the business?"
-          />
-          <Term
-            term="Capital Structure"
-            definition="Preferred shares? Dual-class voting? Insider control?"
-          />
-        </GlossarySection>
+          return (
+            <TabsContent key={tab.id} value={tab.id} className="mt-6 focus-visible:outline-none">
+              {/* Overview: short intro */}
+              {tab.id === 'overview' && !hasSearch && (
+                <div className="mb-6 rounded-lg border border-border bg-muted/10 p-4 text-sm text-muted-foreground leading-relaxed">
+                  <p className="mb-2">
+                    What is an IPO? Why do companies go public? Why does IPO investing carry unique risks and opportunities?
+                  </p>
+                  <p>
+                    This glossary orients you to the lifecycle, filings, and metrics so you can interpret disclosure—not predict short-term price moves. Prospectus helps you interpret filings with a long-term lens. Keep it sober.
+                  </p>
+                </div>
+              )}
 
-        {/* 4. Risks Specific to IPO Investing */}
-        <GlossarySection
-          title="4. Risks Specific to IPO Investing"
-          intro="IPO investing is not inherently superior to buying established companies. It is often higher uncertainty."
-        >
-          <Term
-            term="Information Asymmetry"
-            definition="Public investors receive disclosure; insiders possess operational depth."
-          />
-          <Term
-            term="Limited Operating History"
-            definition="Many IPO companies are unprofitable or have short track records."
-          />
-          <Term
-            term="Lock-Up Expiration Volatility"
-            definition="Supply increases when insiders can sell; share price can be pressured."
-          />
-          <Term
-            term="Narrative Premium"
-            definition="IPO pricing often reflects optimism rather than proven results."
-          />
-          <Term
-            term="No Public Track Record"
-            definition="There is no multi-year earnings history under public scrutiny."
-          />
-        </GlossarySection>
+              {/* IPO Lifecycle: horizontal timeline */}
+              {tab.id === 'lifecycle' && !hasSearch && (
+                <div className="mb-6 overflow-x-auto pb-2">
+                  <div className="flex min-w-max gap-0">
+                    {LIFECYCLE_STEPS.map((step, i) => (
+                      <div key={step} className="flex items-center">
+                        <div className="rounded border border-border bg-card px-2 py-1.5 text-xs font-medium text-foreground whitespace-nowrap">
+                          {step}
+                        </div>
+                        {i < LIFECYCLE_STEPS.length - 1 && (
+                          <div className="mx-0.5 h-px w-3 bg-border shrink-0" aria-hidden />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Private → S-1 Filed → SEC Review → Amendments (S-1/A) → Roadshow → Pricing → 424B4 Filed → Trading Begins → Lock-Up Expiration → First 10-Q → First 10-K
+                  </p>
+                </div>
+              )}
 
-        {/* 5. Behavioral Prudence */}
-        <GlossarySection
-          title="5. Behavioral Prudence"
-          intro="How you approach IPO investing matters. A reason that survives volatility is more durable than momentum."
-        >
-          <Term
-            term="First-Day Pop"
-            definition="Short-term price movement is not long-term performance."
-          />
-          <Term
-            term="Thesis vs. Momentum"
-            definition="Investing requires a reason that can survive volatility."
-          />
-          <Term
-            term="Time Horizon"
-            definition="Realized returns often take years, not days."
-          />
-          <Term
-            term="Concentration Risk"
-            definition="Avoid overexposure to a single new listing."
-          />
-          <Term
-            term="Expect Volatility"
-            definition="New listings frequently experience unstable pricing."
-          />
-        </GlossarySection>
+              {/* Filing Types: table */}
+              {tab.id === 'filing-types' && !hasSearch && (
+                <div className="mb-6 overflow-x-auto rounded-lg border border-border">
+                  <table className="w-full min-w-[520px] text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/20">
+                        <th className="px-3 py-2.5 font-medium text-foreground">Form</th>
+                        <th className="px-3 py-2.5 font-medium text-foreground">Purpose</th>
+                        <th className="px-3 py-2.5 font-medium text-foreground">Timing</th>
+                        <th className="px-3 py-2.5 font-medium text-foreground">Why investors care</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {FILING_TYPES_TABLE.map((row) => (
+                        <tr key={row.form} className="border-b border-border/70 last:border-0">
+                          <td className="px-3 py-2.5 font-medium text-foreground">{row.form}</td>
+                          <td className="px-3 py-2.5 text-muted-foreground">{row.purpose}</td>
+                          <td className="px-3 py-2.5 text-muted-foreground">{row.timing}</td>
+                          <td className="px-3 py-2.5 text-muted-foreground">{row.care}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <p className="border-t border-border bg-muted/10 px-3 py-2 text-xs text-muted-foreground">
+                    Prospectus primarily analyzes 424B4 filings because they contain final offering details.
+                  </p>
+                </div>
+              )}
 
-        {/* 6. Common IPO Red Flags (Advanced) */}
-        <GlossarySection
-          title="6. Common IPO Red Flags"
-          intro="Educational, not alarmist. Signs that warrant closer scrutiny."
-        >
-          <ul className="list-disc list-inside text-sm text-muted-foreground space-y-2 pl-2">
-            <li>Heavy insider selling in the offering.</li>
-            <li>Proceeds primarily used to repay insiders.</li>
-            <li>Rapid revenue growth with declining gross margin.</li>
-            <li>Excessive related-party transactions.</li>
-          </ul>
-        </GlossarySection>
-      </motion.div>
+              {/* Accordion: entries for this tab */}
+              {entries.length > 0 ? (
+                <Accordion type="single" collapsible className="w-full">
+                  {entries.map((entry) => (
+                    <EntryCard
+                      key={entry.id}
+                      entry={entry}
+                      readingMins={readingMinutes(entry.content)}
+                    />
+                  ))}
+                </Accordion>
+              ) : (
+                !hasSearch && (
+                  <p className="text-sm text-muted-foreground">
+                    No entries in this section.
+                  </p>
+                )
+              )}
+            </TabsContent>
+          );
+        })}
+      </Tabs>
 
-      <motion.footer
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.3, delay: 0.1 }}
-        className="pt-8 border-t border-border text-xs text-muted-foreground"
-      >
-        Understand the structure before evaluating the opportunity.
-      </motion.footer>
+      <footer className="border-t border-border pt-6 text-xs text-muted-foreground">
+        Understand the structure before evaluating the opportunity. Knowledge reduces impulse.
+      </footer>
     </div>
   );
 }
