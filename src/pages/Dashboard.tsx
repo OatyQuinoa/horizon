@@ -100,7 +100,7 @@ export default function Dashboard() {
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div>
             <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-2" style={{ fontFamily: "'Fraunces', serif" }}>
-              Recent S-1 Filings
+              Recent Filings
             </h2>
             <p className="text-sm sm:text-base text-muted-foreground">
               Pipeline (S-1/F-1) + Completed (424B4) · SEC EDGAR
@@ -209,30 +209,6 @@ export default function Dashboard() {
             </button>
           </div>
         )}
-      </section>
-
-      {/* Quick Stats Section */}
-      <section className="space-y-4 sm:space-y-6">
-        <h3 className="text-xl sm:text-2xl font-semibold text-foreground" style={{ fontFamily: "'Fraunces', serif" }}>
-          This Week's Activity
-        </h3>
-        
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-          <div className="bg-card/30 border border-border rounded-lg p-5 sm:p-6">
-            <p className="text-xs sm:text-sm text-muted-foreground mb-2">New Filings</p>
-            <p className="text-3xl sm:text-4xl font-mono font-semibold text-foreground">{displayFilings.length}</p>
-          </div>
-          <div className="bg-card/30 border border-border rounded-lg p-5 sm:p-6">
-            <p className="text-xs sm:text-sm text-muted-foreground mb-2">Watchlist</p>
-            <p className="text-3xl sm:text-4xl font-mono font-semibold text-foreground">
-              {mockCompanies.filter(c => c.onWatchlist).length}
-            </p>
-          </div>
-          <div className="bg-card/30 border border-border rounded-lg p-5 sm:p-6">
-            <p className="text-xs sm:text-sm text-muted-foreground mb-2">Opportunities</p>
-            <p className="text-3xl sm:text-4xl font-mono font-semibold text-green-500">2</p>
-          </div>
-        </div>
       </section>
     </div>
   );

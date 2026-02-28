@@ -14,6 +14,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/', label: 'Dashboard' },
     { path: '/watchlist', label: 'Watchlist' },
     { path: '/archive', label: 'Archive' },
+    { path: '/glossary', label: 'Glossary' },
   ];
 
   return (
@@ -23,7 +24,7 @@ export default function Layout({ children }: LayoutProps) {
           <div className="flex items-center justify-between">
             <Link to="/" className="flex items-center gap-3" onClick={() => setMobileMenuOpen(false)}>
               <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">
-                Prospecti
+                Prospectus
               </h1>
             </Link>
             
