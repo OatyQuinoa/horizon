@@ -223,11 +223,15 @@ function getLocalDateStr(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-/** Filter companies by date range and sector for display. Use with cached secFilings from context. */
+/** Filing type filter: all, IPO-priced (424B4), or S-1 (pipeline). */
+export type FilingTypeFilter = 'all' | 'completed' | 'pipeline';
+
+/** Filter companies by date range, sector, and filing type. Use with cached secFilings from context. */
 export function filterFilingsForDisplay(
   companies: Company[],
   daysBack: number,
-  sectorFilter: string
+  sectorFilter: string,
+  filingTypeFilter: FilingTypeFilter = 'all'
 ): Company[] {
   const to = new Date();
   const from = new Date(to);
@@ -238,6 +242,10 @@ export function filterFilingsForDisplay(
     const d = (c.filingDate || '').slice(0, 10);
     if (!d || d.length < 10) return false;
     if (d < dateFrom || d > dateTo) return false;
+    if (filingTypeFilter !== 'all') {
+      if (filingTypeFilter === 'completed' && c.ipoStatus !== 'completed') return false;
+      if (filingTypeFilter === 'pipeline' && c.ipoStatus !== 'pipeline') return false;
+    }
     return sicMatchesSector(c.sicCode ?? null, sectorFilter);
   });
   // Keep most recent first (SEC data may already be sorted; ensure consistency)

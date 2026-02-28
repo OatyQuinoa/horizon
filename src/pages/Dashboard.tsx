@@ -3,7 +3,7 @@ import FeaturedCompanyCard from '@/components/FeaturedCompanyCard';
 import { useCompaniesOptional } from '@/context/CompaniesContext';
 import FilingCard from '@/components/FilingCard';
 import { motion } from 'framer-motion';
-import { getDataSourceLabel, filterFilingsForDisplay } from '@/hooks/use-sec-filings';
+import { getDataSourceLabel, filterFilingsForDisplay, type FilingTypeFilter } from '@/hooks/use-sec-filings';
 import { RefreshCw, Database, Globe, Filter } from 'lucide-react';
 import {
   Select,
@@ -15,13 +15,16 @@ import {
 import { Label } from '@/components/ui/label';
 
 const TIME_FRAME_OPTIONS = [
-  { value: '7', label: 'Last 7 days', days: 7 },
-  { value: '14', label: 'Last 14 days', days: 14 },
-  { value: '30', label: 'Last 30 days', days: 30 },
-  { value: '60', label: 'Last 60 days', days: 60 },
-  { value: '90', label: 'Last 90 days', days: 90 },
-  { value: '180', label: 'Last 6 months', days: 180 },
-  { value: '365', label: 'Last 12 months', days: 365 },
+  { value: 'week', label: 'Week', days: 7 },
+  { value: 'month', label: 'Month', days: 30 },
+  { value: 'quarterly', label: 'Quarterly', days: 90 },
+  { value: 'yearly', label: 'Yearly', days: 365 },
+] as const;
+
+const FILING_TYPE_OPTIONS = [
+  { value: 'all', label: 'All filings' },
+  { value: 'completed', label: 'IPO-priced (424B4)' },
+  { value: 'pipeline', label: 'S-1 (Pipeline)' },
 ] as const;
 
 const SECTOR_OPTIONS = [
@@ -42,8 +45,9 @@ const INITIAL_VISIBLE = 12;
 const LOAD_MORE_COUNT = 12;
 
 export default function Dashboard() {
-  const [timeFrame, setTimeFrame] = useState<string>('30');
+  const [timeFrame, setTimeFrame] = useState<string>('month');
   const [sectorFilter, setSectorFilter] = useState<string>('all');
+  const [filingTypeFilter, setFilingTypeFilter] = useState<FilingTypeFilter>('all');
 
   const daysBack = TIME_FRAME_OPTIONS.find((o) => o.value === timeFrame)?.days ?? 30;
 
@@ -54,12 +58,12 @@ export default function Dashboard() {
   const dataSource = ctx?.dataSource ?? 'loading';
   const refetch = ctx?.refetch ?? (() => Promise.resolve());
 
-  // Filter cached SEC data by selected time frame and sector (no refetch on navigation or filter change)
-  const displayFilings = filterFilingsForDisplay(secFilings, daysBack, sectorFilter);
+  // Filter cached SEC data by timeframe, sector, and filing type (IPO-priced vs S-1)
+  const displayFilings = filterFilingsForDisplay(secFilings, daysBack, sectorFilter, filingTypeFilter);
 
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE);
-  }, [sectorFilter, timeFrame]);
+  }, [sectorFilter, timeFrame, filingTypeFilter]);
 
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
   const recentFilings = displayFilings.slice(0, visibleCount);
@@ -166,6 +170,23 @@ export default function Dashboard() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="flex flex-col gap-1.5 min-w-[160px]">
+              <Label htmlFor="filing-type" className="text-xs text-muted-foreground">
+                Filing type
+              </Label>
+              <Select value={filingTypeFilter} onValueChange={(v) => setFilingTypeFilter(v as FilingTypeFilter)}>
+                <SelectTrigger id="filing-type" className="h-9 w-full sm:w-[200px]">
+                  <SelectValue placeholder="Filing type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {FILING_TYPE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
@@ -178,7 +199,7 @@ export default function Dashboard() {
         {!isLoading && displayFilings.length === 0 && (
           <div className="rounded-lg border border-border bg-card/30 px-4 py-8 text-center text-sm text-muted-foreground">
             {dataSource === 'sec-api'
-              ? `No S-1 filings in the selected time frame (last ${daysBack} days${sectorFilter !== 'all' ? `, ${SECTOR_OPTIONS.find((o) => o.value === sectorFilter)?.label ?? sectorFilter}` : ''}).`
+              ? `No filings in the selected time frame (${TIME_FRAME_OPTIONS.find((o) => o.value === timeFrame)?.label ?? timeFrame}${sectorFilter !== 'all' ? `, ${SECTOR_OPTIONS.find((o) => o.value === sectorFilter)?.label ?? sectorFilter}` : ''}${filingTypeFilter !== 'all' ? `, ${FILING_TYPE_OPTIONS.find((o) => o.value === filingTypeFilter)?.label ?? filingTypeFilter}` : ''}).`
               : 'No recent filings to show. Start the dev server (npm run dev) or production server (npm run start) to load live SEC data.'}
           </div>
         )}
