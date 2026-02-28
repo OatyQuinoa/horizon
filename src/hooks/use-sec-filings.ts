@@ -215,6 +215,14 @@ export function getDataSourceLabel(source: 'sec-api' | 'curated' | 'loading'): s
   }
 }
 
+/** Format a Date as YYYY-MM-DD in local time (for consistent date-range filtering). */
+function getLocalDateStr(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 /** Filter companies by date range and sector for display. Use with cached secFilings from context. */
 export function filterFilingsForDisplay(
   companies: Company[],
@@ -224,13 +232,16 @@ export function filterFilingsForDisplay(
   const to = new Date();
   const from = new Date(to);
   from.setDate(from.getDate() - Math.max(1, daysBack));
-  const dateFrom = from.toISOString().slice(0, 10);
-  const dateTo = to.toISOString().slice(0, 10);
-  return companies.filter((c) => {
+  const dateFrom = getLocalDateStr(from);
+  const dateTo = getLocalDateStr(to);
+  const filtered = companies.filter((c) => {
     const d = (c.filingDate || '').slice(0, 10);
+    if (!d || d.length < 10) return false;
     if (d < dateFrom || d > dateTo) return false;
     return sicMatchesSector(c.sicCode ?? null, sectorFilter);
   });
+  // Keep most recent first (SEC data may already be sorted; ensure consistency)
+  return [...filtered].sort((a, b) => (b.filingDate || '').localeCompare(a.filingDate || ''));
 }
 
 export { formatFilingDate, getRelativeDate };

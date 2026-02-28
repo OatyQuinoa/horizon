@@ -18,7 +18,7 @@ export default function FeaturedCompanyCard({ company }: FeaturedCompanyCardProp
       <div className="space-y-4">
         <div>
           <p className="text-xs sm:text-sm text-muted-foreground uppercase tracking-wider mb-2">
-            This Week's Deep Dive
+            Featured Filing
           </p>
           <h2 className="text-2xl sm:text-4xl font-bold text-foreground mb-2" style={{ fontFamily: "'Fraunces', serif" }}>
             {company.name}

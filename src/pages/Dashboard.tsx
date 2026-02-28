@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { mockCompanies } from '@/data/mockData';
 import FeaturedCompanyCard from '@/components/FeaturedCompanyCard';
 import { useCompaniesOptional } from '@/context/CompaniesContext';
 import FilingCard from '@/components/FilingCard';
@@ -65,9 +64,8 @@ export default function Dashboard() {
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
   const recentFilings = displayFilings.slice(0, visibleCount);
   const hasMore = displayFilings.length > visibleCount;
-  // Featured: first filing when we have live SEC data; otherwise first mock featured for hero only
-  const featuredFromSec = displayFilings[0];
-  const featuredCompany = featuredFromSec ?? mockCompanies.find((c) => c.featured);
+  // Featured: only the first filing from current SEC data (no fixed default like Maplebear)
+  const featuredCompany = displayFilings.length > 0 ? displayFilings[0] : null;
 
   const cardVariants = {
     hidden: { opacity: 0, y: 8 },
