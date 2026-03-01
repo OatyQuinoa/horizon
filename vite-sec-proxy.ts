@@ -251,6 +251,38 @@ export function secProxyPlugin(): Plugin {
             }
           }
 
+          // /api/sec/full-filing?cik=...&accession=... — full submission .txt (prospectus raw text)
+          const fullFilingMatch = url.match(/^\/api\/sec\/full-filing\?(.*)$/);
+          if (fullFilingMatch) {
+            const params = new URLSearchParams(fullFilingMatch[1]);
+            const cik = params.get('cik') ?? '';
+            const accession = params.get('accession') ?? '';
+            if (cik && accession) {
+              const accNoDashes = accession.replace(/-/g, '');
+              const cleanCik = String(cik).replace(/\D/g, '').replace(/^0+/, '') || String(cik).replace(/\D/g, '');
+              const txtUrl = `https://www.sec.gov/Archives/edgar/data/${cleanCik}/${accNoDashes}/${accession}.txt`;
+              try {
+                const secRes = await rateLimitedFetch(txtUrl, {
+                  headers: { 'User-Agent': SEC_USER_AGENT, Accept: 'text/plain' },
+                });
+                if (!secRes.ok) {
+                  res.writeHead(secRes.status, { 'Content-Type': 'application/json' });
+                  res.end(JSON.stringify({ error: 'Full filing not found' }));
+                  return;
+                }
+                const text = await secRes.text();
+                res.writeHead(200, { 'Content-Type': 'text/plain' });
+                res.end(text);
+                return;
+              } catch (err) {
+                console.error('Full filing proxy error:', err);
+                res.writeHead(502, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Proxy error' }));
+                return;
+              }
+            }
+          }
+
           // /api/sec/submissions/CIK0001318605 (or CIK1318605)
           const submissionsMatch = url.match(/^\/api\/sec\/submissions\/CIK(\d+)$/);
           if (submissionsMatch) {

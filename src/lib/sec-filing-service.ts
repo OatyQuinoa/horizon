@@ -9,7 +9,7 @@
  * if 0 results or error, use RSS/Atom feeds. Correlates by CIK to classify status.
  */
 
-import { constructCompanySearchUrl, isSoftwareCompany as isSoftwareSic, padCik } from '@/lib/sec-api';
+import { constructCompanySearchUrl, constructFullFilingTextUrl, isSoftwareCompany as isSoftwareSic, padCik } from '@/lib/sec-api';
 
 const API_BASE = '';
 
@@ -341,6 +341,38 @@ export async function fetchCompanyByCik(cik: string): Promise<CompanyEnrichment 
       sicDescription: sicDescription != null ? String(sicDescription) : null,
       tickers,
     };
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Full filing text (raw .txt) — reliable programmatic access to prospectus content
+// ---------------------------------------------------------------------------
+
+/**
+ * URL for the full filing text (.txt) on SEC EDGAR.
+ * The middle path segment is the accession number with hyphens removed.
+ * Example: CIK 0002100782, accession 0001193125-26-083190
+ *   → .../data/2100782/000119312526083190/0001193125-26-083190.txt
+ */
+export { constructFullFilingTextUrl } from '@/lib/sec-api';
+
+/**
+ * Fetch the full filing text (raw submission .txt) for a given CIK and accession number.
+ * Uses the app proxy /api/sec/full-filing. The .txt contains the entire submission;
+ * you can parse it (e.g. split by <DOCUMENT>...</DOCUMENT> or extract HTML sections)
+ * to extract key prospectus information.
+ */
+export async function fetchFullFilingText(cik: string, accessionNumber: string): Promise<string | null> {
+  const cleanCik = String(cik).replace(/\D/g, '').replace(/^0+/, '') || cik;
+  const accession = accessionNumber.trim();
+  if (!accession) return null;
+  const url = `${API_BASE}/api/sec/full-filing?cik=${encodeURIComponent(cleanCik)}&accession=${encodeURIComponent(accession)}`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return await res.text();
   } catch {
     return null;
   }

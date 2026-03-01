@@ -81,6 +81,27 @@ export function constructFilingUrl(cik: string, accessionNumber: string, documen
 }
 
 /**
+ * Construct URL for the full filing text (raw submission) on SEC EDGAR.
+ * This is the single .txt file that contains the entire submission and is the most reliable
+ * way to retrieve prospectus/filing content programmatically.
+ *
+ * Format:
+ *   https://www.sec.gov/Archives/edgar/data/{CIK_NO_LEADING_ZEROS}/{ACCESSION_NO_HYPHENS}/{ACCESSION_WITH_HYPHENS}.txt
+ *
+ * Example:
+ *   CIK 0002100782, accession 0001193125-26-083190
+ *   → https://www.sec.gov/Archives/edgar/data/2100782/000119312526083190/0001193125-26-083190.txt
+ *
+ * The middle path segment (000119312526083190) is the accession number with hyphens removed.
+ * The filename is the accession number with hyphens plus .txt.
+ */
+export function constructFullFilingTextUrl(cik: string, accessionNumber: string): string {
+  const cleanedCik = cleanCik(cik);
+  const accessionNoHyphens = accessionNumber.replace(/-/g, '');
+  return `${SEC_CONFIG.baseUrls.archives}/${cleanedCik}/${accessionNoHyphens}/${accessionNumber}.txt`;
+}
+
+/**
  * Construct SEC EDGAR company search URL for a given form type.
  * Use S-1 for domestic registration, F-1 for foreign, 424B4 for final prospectus.
  */
