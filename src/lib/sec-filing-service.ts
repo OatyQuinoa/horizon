@@ -47,10 +47,10 @@ function getDateRange(daysBack: number): { dateFrom: string; dateTo: string } {
   const to = new Date();
   const from = new Date(to);
   from.setDate(from.getDate() - Math.max(1, daysBack));
-  return {
-    dateFrom: from.toISOString().slice(0, 10),
-    dateTo: to.toISOString().slice(0, 10),
-  };
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const toLocal = `${to.getFullYear()}-${pad(to.getMonth() + 1)}-${pad(to.getDate())}`;
+  const fromLocal = `${from.getFullYear()}-${pad(from.getMonth() + 1)}-${pad(from.getDate())}`;
+  return { dateFrom: fromLocal, dateTo: toLocal };
 }
 
 function isDateInRange(dateStr: string, dateFrom: string, dateTo: string): boolean {
@@ -120,11 +120,16 @@ async function fetchPipelineFilings(dateFrom: string, dateTo: string): Promise<R
 
 async function fetchCompletedIPOs(dateFrom: string, dateTo: string): Promise<RecentFiling[]> {
   const searchList = await fetchViaSearch(dateFrom, dateTo, 'confirmation');
-  if (searchList.length > 0) {
-    return searchList.map((f) => ({ ...f, secIndexUrl: constructCompanySearchUrl(f.cik, '424B4') }));
+  const from424B4 = await fetchViaRecent424B4();
+  const fallback = from424B4.filter((f) => isDateInRange(f.filingDate, dateFrom, dateTo));
+  const byKey = new Map<string, RecentFiling>();
+  for (const f of fallback) {
+    byKey.set(`${f.cik}-${f.accessionNumber}`, { ...f, secIndexUrl: constructCompanySearchUrl(f.cik, '424B4') });
   }
-  const list = await fetchViaRecent424B4();
-  return list.filter((f) => isDateInRange(f.filingDate, dateFrom, dateTo));
+  for (const f of searchList) {
+    byKey.set(`${f.cik}-${f.accessionNumber}`, { ...f, secIndexUrl: constructCompanySearchUrl(f.cik, '424B4') });
+  }
+  return Array.from(byKey.values()).sort((a, b) => (b.filingDate || '').localeCompare(a.filingDate || ''));
 }
 
 async function fetchViaSearch(dateFrom: string, dateTo: string, layer: 'pipeline' | 'confirmation' = 'pipeline'): Promise<RecentFiling[]> {
@@ -393,41 +398,55 @@ export interface ParsedFilingDocument {
 
 /**
  * Parse SEC full submission .txt into document blocks.
- * Extracts <DOCUMENT>...</DOCUMENT> blocks and their <TYPE>, <SEQUENCE>, <FILENAME>, <TEXT>.
+ * Uses indexOf for large content to avoid regex backtracking. Extracts <DOCUMENT> blocks and <TYPE>, <TEXT>.
  */
 export function parseFullFilingDocuments(raw: string): ParsedFilingDocument[] {
   const docs: ParsedFilingDocument[] = [];
-  const documentRegex = /<DOCUMENT>([\s\S]*?)<\/DOCUMENT>/gi;
-  let match;
-  while ((match = documentRegex.exec(raw)) !== null) {
-    const block = match[1];
+  const docStartTag = '<DOCUMENT>';
+  const docEndTag = '</DOCUMENT>';
+  let start = 0;
+  while (true) {
+    const docStart = raw.indexOf(docStartTag, start);
+    if (docStart === -1) break;
+    const docEnd = raw.indexOf(docEndTag, docStart + docStartTag.length);
+    if (docEnd === -1) break;
+    const block = raw.slice(docStart + docStartTag.length, docEnd);
     const typeMatch = block.match(/<TYPE>([^<]*)<\/TYPE>/i);
     const seqMatch = block.match(/<SEQUENCE>([^<]*)<\/SEQUENCE>/i);
     const fileMatch = block.match(/<FILENAME>([^<]*)<\/FILENAME>/i);
-    const textMatch = block.match(/<TEXT>([\s\S]*?)<\/TEXT>/i);
+    const textOpen = block.indexOf('<TEXT>');
+    const textClose = textOpen >= 0 ? block.indexOf('</TEXT>', textOpen + 6) : -1;
     const type = (typeMatch?.[1] ?? '').trim();
     const sequence = (seqMatch?.[1] ?? '').trim();
     const filename = (fileMatch?.[1] ?? '').trim();
-    let text = (textMatch?.[1] ?? '').trim();
-    if (!text) continue;
+    let text = textOpen >= 0 && textClose > textOpen
+      ? block.slice(textOpen + 6, textClose).trim()
+      : '';
+    if (!text) {
+      start = docEnd + docEndTag.length;
+      continue;
+    }
     const isHtml = /<\s*(html|body|div|table|p)\s[\s>]/i.test(text) || text.trimStart().startsWith('<!');
     docs.push({ type, sequence, filename, text, isHtml });
+    start = docEnd + docEndTag.length;
   }
   return docs;
 }
 
 /**
  * Extract the best HTML document from parsed SEC filing for prospectus display.
- * Prefers 424B4 or S-1 type; falls back to first substantial HTML document.
+ * Prefers 424B4 or S-1 type; falls back to first substantial HTML document, then largest HTML-like block.
  */
 export function extractMainProspectusHtml(docs: ParsedFilingDocument[]): string | null {
   const preferTypes = ['424B4', '424B3', 'S-1', 'S-1/A', 'F-1', 'F-1/A'];
   for (const form of preferTypes) {
-    const found = docs.find((d) => d.type.toUpperCase() === form && d.isHtml && d.text.length > 500);
+    const found = docs.find((d) => d.type.toUpperCase() === form && (d.isHtml || d.text.length > 2000) && d.text.length > 500);
     if (found) return found.text;
   }
-  const firstHtml = docs.find((d) => d.isHtml && d.text.length > 500);
-  return firstHtml?.text ?? null;
+  const firstHtml = docs.find((d) => (d.isHtml || d.text.length > 2000) && d.text.length > 500);
+  if (firstHtml) return firstHtml.text;
+  const bySize = docs.filter((d) => d.text.length > 500).sort((a, b) => b.text.length - a.text.length);
+  return bySize[0]?.text ?? null;
 }
 
 // ---------------------------------------------------------------------------

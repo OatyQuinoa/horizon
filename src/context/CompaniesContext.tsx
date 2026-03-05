@@ -48,7 +48,7 @@ function SecFilingsLoader({
   setLastUpdated: (v: Date | null) => void;
   refetchRef: React.MutableRefObject<(() => Promise<void>) | undefined>;
 }) {
-  const { filings, isLoading, error, dataSource, lastUpdated, refetch } = useSecFilings(90, 'all');
+  const { filings, isLoading, error, dataSource, lastUpdated, refetch } = useSecFilings(180, 'all');
 
   refetchRef.current = refetch;
 
@@ -85,7 +85,13 @@ export function CompaniesProvider({ children }: { children: ReactNode }) {
   const refetchRef = useRef<(() => Promise<void>) | undefined>();
 
   const setSecFilings = useCallback((filings: Company[]) => {
-    setSecFilingsState(filings);
+    setSecFilingsState((prev) => {
+      const byId = new Map(prev.map((c) => [c.id, c]));
+      for (const f of filings) {
+        byId.set(f.id, f);
+      }
+      return Array.from(byId.values()).sort((a, b) => (b.filingDate || '').localeCompare(a.filingDate || ''));
+    });
   }, []);
 
   const setDashboardFilters = useCallback((updates: Partial<DashboardFilters>) => {
