@@ -48,7 +48,7 @@ function SecFilingsLoader({
   setLastUpdated: (v: Date | null) => void;
   refetchRef: React.MutableRefObject<(() => Promise<void>) | undefined>;
 }) {
-  const { filings, isLoading, error, dataSource, lastUpdated, refetch } = useSecFilings(180, 'all');
+  const { filings, isLoading, error, dataSource, lastUpdated, refetch } = useSecFilings(365, 'all');
 
   refetchRef.current = refetch;
 

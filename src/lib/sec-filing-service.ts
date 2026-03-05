@@ -109,13 +109,20 @@ export async function fetchRecentS1Filings(daysBack: number): Promise<RecentFili
 }
 
 async function fetchPipelineFilings(dateFrom: string, dateTo: string): Promise<RecentFiling[]> {
-  const searchList = await fetchViaSearch(dateFrom, dateTo, 'pipeline');
-  if (searchList.length > 0) {
-    return searchList.map((f) => ({ ...f, secIndexUrl: constructCompanySearchUrl(f.cik, f.formType || 'S-1') }));
-  }
-  const [s1List, f1List] = await Promise.all([fetchViaRecentForm('S-1'), fetchViaRecentForm('F-1')]);
-  const combined = [...s1List, ...f1List].filter((f) => isDateInRange(f.filingDate, dateFrom, dateTo));
-  return combined;
+  const [searchList, s1List, f1List] = await Promise.all([
+    fetchViaSearch(dateFrom, dateTo, 'pipeline'),
+    fetchViaRecentForm('S-1'),
+    fetchViaRecentForm('F-1'),
+  ]);
+  const byKey = new Map<string, RecentFiling>();
+  const add = (f: RecentFiling) => {
+    const key = `${f.cik}-${f.accessionNumber}`;
+    if (!byKey.has(key)) byKey.set(key, { ...f, secIndexUrl: constructCompanySearchUrl(f.cik, f.formType || 'S-1') });
+  };
+  for (const f of searchList) add({ ...f, secIndexUrl: constructCompanySearchUrl(f.cik, f.formType || 'S-1') });
+  for (const f of s1List) if (isDateInRange(f.filingDate, dateFrom, dateTo)) add(f);
+  for (const f of f1List) if (isDateInRange(f.filingDate, dateFrom, dateTo)) add(f);
+  return Array.from(byKey.values()).sort((a, b) => (b.filingDate || '').localeCompare(a.filingDate || ''));
 }
 
 async function fetchCompletedIPOs(dateFrom: string, dateTo: string): Promise<RecentFiling[]> {
@@ -132,47 +139,63 @@ async function fetchCompletedIPOs(dateFrom: string, dateTo: string): Promise<Rec
   return Array.from(byKey.values()).sort((a, b) => (b.filingDate || '').localeCompare(a.filingDate || ''));
 }
 
-async function fetchViaSearch(dateFrom: string, dateTo: string, layer: 'pipeline' | 'confirmation' = 'pipeline'): Promise<RecentFiling[]> {
-  const url = `${API_BASE}/api/sec/search?dateFrom=${encodeURIComponent(dateFrom)}&dateTo=${encodeURIComponent(dateTo)}&layer=${layer}`;
-  console.log(`${LOG_PREFIX} GET ${url}`);
-  try {
-    const res = await fetch(url);
-    if (!res.ok) {
-      console.warn(`${LOG_PREFIX} Search (${layer}) failed: ${res.status}`);
-      return [];
-    }
-    const data = await res.json();
-    const hits = data?.hits?.hits ?? [];
-    const list: RecentFiling[] = [];
-    for (const hit of hits) {
-      const src = hit?._source;
-      if (!src) continue;
-      const cik = (src.ciks && src.ciks[0]) ? String(src.ciks[0]).padStart(10, '0') : '';
-      const fileDate = src.file_date ?? '';
-      const form = src.form ?? 'S-1';
-      const accessionNumber = src.accession_number ?? '';
-      const companyName = (src.display_names && src.display_names[0]) ? src.display_names[0] : 'Unknown';
-      if (!cik) continue;
-      list.push({
-        id: `${cik}-${accessionNumber || fileDate}`,
-        cik,
-        companyName,
-        filingDate: fileDate,
-        formType: form,
-        accessionNumber,
-        secIndexUrl: constructCompanySearchUrl(cik, form),
-      });
-    }
-    return list;
-  } catch (e) {
-    console.warn(`${LOG_PREFIX} Search (${layer}) request failed:`, e);
-    return [];
+const SEARCH_PAGE_SIZE = 400;
+
+function parseSearchHits(hits: unknown[], layer: 'pipeline' | 'confirmation'): RecentFiling[] {
+  const list: RecentFiling[] = [];
+  for (const hit of hits) {
+    const src = (hit as { _source?: Record<string, unknown> })?._source;
+    if (!src) continue;
+    const ciks = src.ciks as string[] | undefined;
+    const cik = ciks?.[0] ? String(ciks[0]).padStart(10, '0') : '';
+    const fileDate = (src.file_date as string) ?? '';
+    const form = ((src.form as string) ?? 'S-1').trim();
+    const accessionNumber = (src.accession_number as string) ?? '';
+    const displayNames = src.display_names as string[] | undefined;
+    const companyName = displayNames?.[0] ?? 'Unknown';
+    if (!cik) continue;
+    const formType = layer === 'confirmation' ? '424B4' : form;
+    list.push({
+      id: `${cik}-${accessionNumber || fileDate}`,
+      cik,
+      companyName,
+      filingDate: fileDate,
+      formType,
+      accessionNumber,
+      secIndexUrl: constructCompanySearchUrl(cik, formType),
+    });
   }
+  return list;
+}
+
+async function fetchViaSearch(dateFrom: string, dateTo: string, layer: 'pipeline' | 'confirmation' = 'pipeline'): Promise<RecentFiling[]> {
+  const byKey = new Map<string, RecentFiling>();
+  for (let from = 0; from < 800; from += SEARCH_PAGE_SIZE) {
+    const url = `${API_BASE}/api/sec/search?dateFrom=${encodeURIComponent(dateFrom)}&dateTo=${encodeURIComponent(dateTo)}&layer=${layer}&from=${from}&size=${SEARCH_PAGE_SIZE}`;
+    console.log(`${LOG_PREFIX} GET ${url}`);
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        console.warn(`${LOG_PREFIX} Search (${layer}) failed: ${res.status}`);
+        break;
+      }
+      const data = await res.json();
+      const hits = data?.hits?.hits ?? [];
+      const list = parseSearchHits(hits, layer);
+      if (list.length === 0) break;
+      for (const f of list) byKey.set(`${f.cik}-${f.accessionNumber}`, f);
+      if (hits.length < SEARCH_PAGE_SIZE) break;
+    } catch (e) {
+      console.warn(`${LOG_PREFIX} Search (${layer}) request failed:`, e);
+      break;
+    }
+  }
+  return Array.from(byKey.values()).sort((a, b) => (b.filingDate || '').localeCompare(a.filingDate || ''));
 }
 
 async function fetchViaRecentForm(formType: 'S-1' | 'F-1'): Promise<RecentFiling[]> {
   const endpoint = formType === 'S-1' ? 'recent-s1' : 'recent-f1';
-  const url = `${API_BASE}/api/sec/${endpoint}?count=80`;
+  const url = `${API_BASE}/api/sec/${endpoint}?count=200`;
   try {
     const res = await fetch(url);
     if (!res.ok) return [];
@@ -196,7 +219,7 @@ async function fetchViaRecentForm(formType: 'S-1' | 'F-1'): Promise<RecentFiling
 }
 
 async function fetchViaRecent424B4(): Promise<RecentFiling[]> {
-  const url = `${API_BASE}/api/sec/recent-424b4?count=80`;
+  const url = `${API_BASE}/api/sec/recent-424b4?count=200`;
   try {
     const res = await fetch(url);
     if (!res.ok) return [];

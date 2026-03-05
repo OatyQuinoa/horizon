@@ -39,7 +39,7 @@ export default async function handler(req, res) {
     res.status(405).end(JSON.stringify({ error: 'Method not allowed' }));
     return;
   }
-  const count = Math.min(Number(req.query.count) || 80, 80);
+  const count = Math.min(Math.max(Number(req.query.count) || 200, 1), 200);
   const atomUrl = `https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&CIK=&type=424B4&company=&dateb=&owner=exclude&start=0&count=${count}&output=atom`;
   try {
     const secRes = await fetch(atomUrl, {

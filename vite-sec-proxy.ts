@@ -82,11 +82,13 @@ export function secProxyPlugin(): Plugin {
             const dateFrom = params.get('dateFrom') ?? '';
             const dateTo = params.get('dateTo') ?? '';
             const layer = params.get('layer') ?? 'pipeline';
+            const from = Math.max(0, Number(params.get('from')) || 0);
+            const size = Math.min(400, Math.max(1, Number(params.get('size')) || 400));
             const formsQuery =
               layer === 'confirmation'
                 ? 'forms:424B4'
                 : 'forms:(S-1 OR "S-1/A" OR F-1 OR "F-1/A")';
-            const searchUrl = `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(formsQuery)}&dateRange=custom&startdt=${dateFrom}&enddt=${dateTo}&from=0&size=100`;
+            const searchUrl = `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(formsQuery)}&dateRange=custom&startdt=${dateFrom}&enddt=${dateTo}&from=${from}&size=${size}`;
             const secRes = await rateLimitedFetch(searchUrl);
             const body = await secRes.text();
             res.writeHead(secRes.status, {
@@ -100,7 +102,7 @@ export function secProxyPlugin(): Plugin {
           const recentS1Match = url.match(/^\/api\/sec\/recent-s1\?(.*)$/);
           if (recentS1Match) {
             const params = new URLSearchParams(recentS1Match[1]);
-            const count = Math.min(Number(params.get('count')) || 80, 80);
+            const count = Math.min(Math.max(Number(params.get('count')) || 200, 1), 200);
             const atomUrl = `https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&CIK=&type=S-1&company=&dateb=&owner=exclude&start=0&count=${count}&output=atom`;
             const secRes = await rateLimitedFetch(atomUrl, {
               headers: { Accept: 'application/atom+xml, application/xml, text/xml' },
@@ -116,7 +118,7 @@ export function secProxyPlugin(): Plugin {
           const recentF1Match = url.match(/^\/api\/sec\/recent-f1\?(.*)$/);
           if (recentF1Match) {
             const params = new URLSearchParams(recentF1Match[1]);
-            const count = Math.min(Number(params.get('count')) || 80, 80);
+            const count = Math.min(Math.max(Number(params.get('count')) || 200, 1), 200);
             const atomUrl = `https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&CIK=&type=F-1&company=&dateb=&owner=exclude&start=0&count=${count}&output=atom`;
             const secRes = await rateLimitedFetch(atomUrl, {
               headers: { Accept: 'application/atom+xml, application/xml, text/xml' },
@@ -132,7 +134,7 @@ export function secProxyPlugin(): Plugin {
           const recent424Match = url.match(/^\/api\/sec\/recent-424b4\?(.*)$/);
           if (recent424Match) {
             const params = new URLSearchParams(recent424Match[1]);
-            const count = Math.min(Number(params.get('count')) || 80, 80);
+            const count = Math.min(Math.max(Number(params.get('count')) || 200, 1), 200);
             const atomUrl = `https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&CIK=&type=424B4&company=&dateb=&owner=exclude&start=0&count=${count}&output=atom`;
             const secRes = await rateLimitedFetch(atomUrl, {
               headers: { Accept: 'application/atom+xml, application/xml, text/xml' },
