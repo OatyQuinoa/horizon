@@ -75,21 +75,34 @@ export function secProxyPlugin(): Plugin {
             return;
           }
 
-          // /api/sec/search?dateFrom=...&dateTo=...&layer=pipeline|confirmation
+          // /api/sec/search?dateFrom=...&dateTo=...&layer=pipeline|confirmation&from=0&size=400
           const searchMatch = url.match(/^\/api\/sec\/search\?(.*)$/);
           if (searchMatch) {
             const params = new URLSearchParams(searchMatch[1]);
             const dateFrom = params.get('dateFrom') ?? '';
             const dateTo = params.get('dateTo') ?? '';
             const layer = params.get('layer') ?? 'pipeline';
-            const start = Math.max(0, Number(params.get('start')) || Number(params.get('from')) || 0);
-            const count = Math.min(400, Math.max(1, Number(params.get('count')) || Number(params.get('size')) || 400));
+            const from = Math.max(0, Number(params.get('from')) || Number(params.get('start')) || 0);
+            const size = Math.min(400, Math.max(1, Number(params.get('size')) || Number(params.get('count')) || 400));
             const formsQuery =
               layer === 'confirmation'
                 ? 'forms:424B4'
                 : 'forms:(S-1 OR "S-1/A" OR F-1 OR "F-1/A")';
-            const searchUrl = `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(formsQuery)}&dateRange=custom&startdt=${dateFrom}&enddt=${dateTo}&start=${start}&count=${count}`;
-            const secRes = await rateLimitedFetch(searchUrl);
+            // SEC full-text search returns 30 by default; POST with JSON body (from/size) is required for pagination
+            const searchUrl = 'https://efts.sec.gov/LATEST/search-index';
+            const bodyJson = {
+              q: formsQuery,
+              dateRange: 'custom',
+              startdt: dateFrom,
+              enddt: dateTo,
+              from,
+              size,
+            };
+            const secRes = await rateLimitedFetch(searchUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(bodyJson),
+            });
             const body = await secRes.text();
             res.writeHead(secRes.status, {
               'Content-Type': secRes.headers.get('Content-Type') ?? 'application/json',

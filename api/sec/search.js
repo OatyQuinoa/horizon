@@ -22,16 +22,28 @@ export default async function handler(req, res) {
   const dateFrom = req.query.dateFrom ?? '';
   const dateTo = req.query.dateTo ?? '';
   const layer = req.query.layer ?? 'pipeline';
-  const start = Math.max(0, Number(req.query.start) || Number(req.query.from) || 0);
-  const count = Math.min(400, Math.max(1, Number(req.query.count) || Number(req.query.size) || 400));
+  const from = Math.max(0, Number(req.query.from) || Number(req.query.start) || 0);
+  const size = Math.min(400, Math.max(1, Number(req.query.size) || Number(req.query.count) || 400));
   const formsQuery = LAYER_QUERIES[layer] ?? LAYER_QUERIES.pipeline;
-  const searchUrl = `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(formsQuery)}&dateRange=custom&startdt=${dateFrom}&enddt=${dateTo}&start=${start}&count=${count}`;
+  // SEC full-text search returns 30 by default for GET; POST with JSON body (from/size) is required for pagination
+  const searchUrl = 'https://efts.sec.gov/LATEST/search-index';
+  const bodyJson = {
+    q: formsQuery,
+    dateRange: 'custom',
+    startdt: dateFrom,
+    enddt: dateTo,
+    from,
+    size,
+  };
   try {
     const secRes = await fetch(searchUrl, {
+      method: 'POST',
       headers: {
         'User-Agent': SEC_USER_AGENT,
+        'Content-Type': 'application/json',
         Accept: 'application/json',
       },
+      body: JSON.stringify(bodyJson),
     });
     const body = await secRes.text();
     res.status(secRes.status).setHeader(
