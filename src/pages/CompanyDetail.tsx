@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 
 function ViewProspectusLink({
   cik,
@@ -48,16 +48,14 @@ function ViewProspectusLink({
 }
 import { mockCompanies, mockMetrics } from '@/data/mockData';
 import MetricCard from '@/components/MetricCard';
-import { ArrowLeft, ExternalLink, Edit2, Save, X, Star, FileText, Building2 } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Star, FileText, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Textarea } from '@/components/ui/textarea';
 import { motion } from 'framer-motion';
 import { formatLargeNumber, formatPercentage } from '@/lib/sec-api';
 import { useCompaniesOptional } from '@/context/CompaniesContext';
 import { fetchCompanyById } from '@/lib/sec-filing-service';
 import { Company } from '@/types';
 import LoadingSpinner from '@/components/LoadingSpinner';
-import ProspectusBriefingCard from '@/components/ProspectusBriefing';
 
 export default function CompanyDetail() {
   const { id } = useParams<{ id: string }>();
@@ -89,18 +87,11 @@ export default function CompanyDetail() {
     }
   }, [id, fromContext, fromMock]);
 
-  const [isEditingThesis, setIsEditingThesis] = useState(false);
-  const [isEditingConcerns, setIsEditingConcerns] = useState(false);
-  const [thesis, setThesis] = useState(company?.thesis || '');
-  const [concerns, setConcerns] = useState(company?.concerns || '');
   const [onWatchlist, setOnWatchlist] = useState(company?.onWatchlist || false);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    if (company) {
-      setThesis(company.thesis || '');
-      setConcerns(company.concerns || '');
-      setOnWatchlist(company.onWatchlist || false);
-    }
+    if (company) setOnWatchlist(company.onWatchlist || false);
   }, [company?.id]);
 
   if (isFetching) {
@@ -123,16 +114,6 @@ export default function CompanyDetail() {
   }
 
   const metrics = mockMetrics[company.id as keyof typeof mockMetrics] || [];
-
-  const handleSaveThesis = () => {
-    setIsEditingThesis(false);
-    toast.success('Investment thesis saved');
-  };
-
-  const handleSaveConcerns = () => {
-    setIsEditingConcerns(false);
-    toast.success('Concerns saved');
-  };
 
   const toggleWatchlist = () => {
     setOnWatchlist(!onWatchlist);
@@ -321,20 +302,17 @@ export default function CompanyDetail() {
                   <ExternalLink className="w-3 h-3" />
                 </a>
               )}
+              {company.accessionNumber && company.cik && (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/company/${company.id}/prospectus-editor`)}
+                  className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
+                >
+                  <FileText className="w-4 h-4" />
+                  View Prospectus Editor
+                </button>
+              )}
             </div>
-            {company.accessionNumber && company.cik && (
-              <>
-                <ProspectusBriefingCard
-                companyName={company.name}
-                cik={company.cik}
-                accessionNumber={company.accessionNumber}
-                filingDate={company.filingDate}
-                formType={company.ipoStatus === 'completed' ? '424B4' : 'S-1'}
-                filingDates={company.filingDates}
-                onError={(msg) => toast.error(msg)}
-              />
-              </>
-            )}
           </div>
         </div>
       </motion.section>
@@ -377,135 +355,6 @@ export default function CompanyDetail() {
         </motion.section>
       )}
 
-      {/* Investment Thesis */}
-      <motion.section
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.3 }}
-        className="space-y-4"
-      >
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl sm:text-2xl font-semibold text-foreground" style={{ fontFamily: "'Fraunces', serif" }}>
-            Investment Thesis
-          </h2>
-          {!isEditingThesis && (
-            <button
-              onClick={() => setIsEditingThesis(true)}
-              className="flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
-            >
-              <Edit2 className="w-4 h-4" />
-              Edit
-            </button>
-          )}
-        </div>
-
-        {isEditingThesis ? (
-          <div className="space-y-3">
-            <Textarea
-              value={thesis}
-              onChange={(e) => setThesis(e.target.value)}
-              className="min-h-[200px] bg-card border-border text-foreground"
-              placeholder="Write your investment thesis..."
-            />
-            <div className="flex gap-3">
-              <button
-                onClick={handleSaveThesis}
-                className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-all"
-              >
-                <Save className="w-4 h-4" />
-                Save
-              </button>
-              <button
-                onClick={() => {
-                  setIsEditingThesis(false);
-                  setThesis(company.thesis || '');
-                }}
-                className="flex items-center gap-2 px-4 py-2 bg-card border border-border text-foreground rounded-md hover:bg-card/80 transition-all"
-              >
-                <X className="w-4 h-4" />
-                Cancel
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="bg-card/30 border-l-4 border-primary rounded-lg p-5 sm:p-8">
-            {thesis ? (
-              <p className="text-foreground/90 leading-relaxed text-base sm:text-lg">
-                {thesis}
-              </p>
-            ) : (
-              <p className="text-muted-foreground italic text-sm sm:text-base">
-                No investment thesis written yet. Click Edit to add your analysis.
-              </p>
-            )}
-          </div>
-        )}
-      </motion.section>
-
-      {/* Concerns */}
-      <motion.section
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.4 }}
-        className="space-y-4"
-      >
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl sm:text-2xl font-semibold text-foreground" style={{ fontFamily: "'Fraunces', serif" }}>
-            Concerns & Risks
-          </h2>
-          {!isEditingConcerns && (
-            <button
-              onClick={() => setIsEditingConcerns(true)}
-              className="flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
-            >
-              <Edit2 className="w-4 h-4" />
-              Edit
-            </button>
-          )}
-        </div>
-
-        {isEditingConcerns ? (
-          <div className="space-y-3">
-            <Textarea
-              value={concerns}
-              onChange={(e) => setConcerns(e.target.value)}
-              className="min-h-[200px] bg-card border-border text-foreground"
-              placeholder="Write your concerns and risk analysis..."
-            />
-            <div className="flex gap-3">
-              <button
-                onClick={handleSaveConcerns}
-                className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-all"
-              >
-                <Save className="w-4 h-4" />
-                Save
-              </button>
-              <button
-                onClick={() => {
-                  setIsEditingConcerns(false);
-                  setConcerns(company.concerns || '');
-                }}
-                className="flex items-center gap-2 px-4 py-2 bg-card border border-border text-foreground rounded-md hover:bg-card/80 transition-all"
-              >
-                <X className="w-4 h-4" />
-                Cancel
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="bg-card/30 border-l-4 border-destructive rounded-lg p-5 sm:p-8">
-            {concerns ? (
-              <p className="text-foreground/90 leading-relaxed text-base sm:text-lg">
-                {concerns}
-              </p>
-            ) : (
-              <p className="text-muted-foreground italic text-sm sm:text-base">
-                No concerns documented yet. Click Edit to add risk analysis.
-              </p>
-            )}
-          </div>
-        )}
-      </motion.section>
     </div>
   );
 }

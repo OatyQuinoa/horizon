@@ -361,8 +361,7 @@ export { constructFullFilingTextUrl } from '@/lib/sec-api';
 /**
  * Fetch the full filing text (raw submission .txt) for a given CIK and accession number.
  * Uses the app proxy /api/sec/full-filing. The .txt contains the entire submission;
- * you can parse it (e.g. split by <DOCUMENT>...</DOCUMENT> or extract HTML sections)
- * to extract key prospectus information.
+ * use parseFullFilingHtml to extract the main HTML document for display.
  */
 export async function fetchFullFilingText(cik: string, accessionNumber: string): Promise<string | null> {
   const cleanCik = String(cik).replace(/\D/g, '').replace(/^0+/, '') || cik;
@@ -371,11 +370,64 @@ export async function fetchFullFilingText(cik: string, accessionNumber: string):
   const url = `${API_BASE}/api/sec/full-filing?cik=${encodeURIComponent(cleanCik)}&accession=${encodeURIComponent(accession)}`;
   try {
     const res = await fetch(url);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      if (res.status === 429) throw new Error('RATE_LIMIT');
+      if (res.status === 404) throw new Error('NOT_FOUND');
+      throw new Error(`HTTP_${res.status}`);
+    }
     return await res.text();
-  } catch {
-    return null;
+  } catch (e) {
+    if (e instanceof Error && (e.message === 'RATE_LIMIT' || e.message === 'NOT_FOUND' || e.message.startsWith('HTTP_'))) throw e;
+    throw new Error('NETWORK_ERROR');
   }
+}
+
+/** Parsed document from SEC full filing .txt */
+export interface ParsedFilingDocument {
+  type: string;
+  sequence: string;
+  filename: string;
+  text: string;
+  isHtml: boolean;
+}
+
+/**
+ * Parse SEC full submission .txt into document blocks.
+ * Extracts <DOCUMENT>...</DOCUMENT> blocks and their <TYPE>, <SEQUENCE>, <FILENAME>, <TEXT>.
+ */
+export function parseFullFilingDocuments(raw: string): ParsedFilingDocument[] {
+  const docs: ParsedFilingDocument[] = [];
+  const documentRegex = /<DOCUMENT>([\s\S]*?)<\/DOCUMENT>/gi;
+  let match;
+  while ((match = documentRegex.exec(raw)) !== null) {
+    const block = match[1];
+    const typeMatch = block.match(/<TYPE>([^<]*)<\/TYPE>/i);
+    const seqMatch = block.match(/<SEQUENCE>([^<]*)<\/SEQUENCE>/i);
+    const fileMatch = block.match(/<FILENAME>([^<]*)<\/FILENAME>/i);
+    const textMatch = block.match(/<TEXT>([\s\S]*?)<\/TEXT>/i);
+    const type = (typeMatch?.[1] ?? '').trim();
+    const sequence = (seqMatch?.[1] ?? '').trim();
+    const filename = (fileMatch?.[1] ?? '').trim();
+    let text = (textMatch?.[1] ?? '').trim();
+    if (!text) continue;
+    const isHtml = /<\s*(html|body|div|table|p)\s[\s>]/i.test(text) || text.trimStart().startsWith('<!');
+    docs.push({ type, sequence, filename, text, isHtml });
+  }
+  return docs;
+}
+
+/**
+ * Extract the best HTML document from parsed SEC filing for prospectus display.
+ * Prefers 424B4 or S-1 type; falls back to first substantial HTML document.
+ */
+export function extractMainProspectusHtml(docs: ParsedFilingDocument[]): string | null {
+  const preferTypes = ['424B4', '424B3', 'S-1', 'S-1/A', 'F-1', 'F-1/A'];
+  for (const form of preferTypes) {
+    const found = docs.find((d) => d.type.toUpperCase() === form && d.isHtml && d.text.length > 500);
+    if (found) return found.text;
+  }
+  const firstHtml = docs.find((d) => d.isHtml && d.text.length > 500);
+  return firstHtml?.text ?? null;
 }
 
 // ---------------------------------------------------------------------------

@@ -5,6 +5,7 @@ import Dashboard from "./pages/Dashboard";
 import Watchlist from "./pages/Watchlist";
 import Archive from "./pages/Archive";
 import CompanyDetail from "./pages/CompanyDetail";
+import ProspectusEditor from "./pages/ProspectusEditor";
 import Glossary from "./pages/Glossary";
 import LoadingSpinner from "./components/LoadingSpinner";
 import { Toaster } from "./components/ui/sonner";
@@ -21,6 +22,7 @@ function App() {
             <Route path="/archive" element={<Archive />} />
             <Route path="/glossary" element={<Glossary />} />
             <Route path="/company/:id" element={<CompanyDetail />} />
+            <Route path="/company/:id/prospectus-editor" element={<ProspectusEditor />} />
           </Routes>
         </Layout>
       </Suspense>
