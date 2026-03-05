@@ -41,8 +41,8 @@ const SECTOR_OPTIONS = [
   { value: 'other', label: 'Other' },
 ] as const;
 
-const INITIAL_VISIBLE = 12;
-const LOAD_MORE_COUNT = 12;
+const INITIAL_VISIBLE = 100;
+const LOAD_MORE_COUNT = 50;
 
 export default function Dashboard() {
   const ctx = useCompaniesOptional();

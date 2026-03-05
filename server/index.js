@@ -92,12 +92,17 @@ const server = http.createServer(async (req, res) => {
       if (pathname.startsWith('/api/sec/search')) {
         const dateFrom = parsed.searchParams.get('dateFrom') || '';
         const dateTo = parsed.searchParams.get('dateTo') || '';
-        const start = Math.max(0, Number(parsed.searchParams.get('start') || parsed.searchParams.get('from') || 0));
-        const count = Math.min(400, Math.max(1, Number(parsed.searchParams.get('count') || parsed.searchParams.get('size') || 400)));
+        const from = Math.max(0, Number(parsed.searchParams.get('from') || parsed.searchParams.get('start') || 0));
+        const size = Math.min(400, Math.max(1, Number(parsed.searchParams.get('size') || parsed.searchParams.get('count') || 400)));
         const layer = parsed.searchParams.get('layer') || 'pipeline';
         const formsQuery = layer === 'confirmation' ? 'forms:424B4' : 'forms:(S-1 OR "S-1/A" OR F-1 OR "F-1/A")';
-        const searchUrl = `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(formsQuery)}&dateRange=custom&startdt=${dateFrom}&enddt=${dateTo}&start=${start}&count=${count}`;
-        const secRes = await rateLimitedFetch(searchUrl);
+        const searchUrl = 'https://efts.sec.gov/LATEST/search-index';
+        const bodyJson = { q: formsQuery, dateRange: 'custom', startdt: dateFrom, enddt: dateTo, from, size };
+        const secRes = await rateLimitedFetch(searchUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bodyJson),
+        });
         const body = await secRes.text();
         res.writeHead(secRes.status, { 'Content-Type': secRes.headers.get('Content-Type') || 'application/json' });
         res.end(body);

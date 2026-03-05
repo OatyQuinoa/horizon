@@ -88,7 +88,7 @@ export function secProxyPlugin(): Plugin {
               layer === 'confirmation'
                 ? 'forms:424B4'
                 : 'forms:(S-1 OR "S-1/A" OR F-1 OR "F-1/A")';
-            // SEC full-text search returns 30 by default; POST with JSON body (from/size) is required for pagination
+            // SEC full-text search returns 30 by default for GET; POST with JSON body (from/size) enables larger pages
             const searchUrl = 'https://efts.sec.gov/LATEST/search-index';
             const bodyJson = {
               q: formsQuery,
@@ -98,11 +98,15 @@ export function secProxyPlugin(): Plugin {
               from,
               size,
             };
-            const secRes = await rateLimitedFetch(searchUrl, {
+            let secRes = await rateLimitedFetch(searchUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(bodyJson),
             });
+            if (secRes.status === 405 || secRes.status === 404) {
+              const getUrl = `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(formsQuery)}&dateRange=custom&startdt=${dateFrom}&enddt=${dateTo}&from=${from}&size=${size}`;
+              secRes = await rateLimitedFetch(getUrl);
+            }
             const body = await secRes.text();
             res.writeHead(secRes.status, {
               'Content-Type': secRes.headers.get('Content-Type') ?? 'application/json',

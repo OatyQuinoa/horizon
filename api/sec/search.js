@@ -36,7 +36,7 @@ export default async function handler(req, res) {
     size,
   };
   try {
-    const secRes = await fetch(searchUrl, {
+    let secRes = await fetch(searchUrl, {
       method: 'POST',
       headers: {
         'User-Agent': SEC_USER_AGENT,
@@ -45,6 +45,10 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify(bodyJson),
     });
+    if (secRes.status === 405 || secRes.status === 404) {
+      const getUrl = `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(formsQuery)}&dateRange=custom&startdt=${dateFrom}&enddt=${dateTo}&from=${from}&size=${size}`;
+      secRes = await fetch(getUrl, { headers: { 'User-Agent': SEC_USER_AGENT, Accept: 'application/json' } });
+    }
     const body = await secRes.text();
     res.status(secRes.status).setHeader(
       'Content-Type',

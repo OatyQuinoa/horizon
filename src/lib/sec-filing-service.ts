@@ -150,7 +150,7 @@ function parseSearchHits(hits: unknown[], layer: 'pipeline' | 'confirmation'): R
     const cik = ciks?.[0] ? String(ciks[0]).padStart(10, '0') : '';
     const fileDate = (src.file_date as string) ?? '';
     const form = ((src.form as string) ?? 'S-1').trim();
-    const accessionNumber = (src.accession_number as string) ?? '';
+    const accessionNumber = (src.accession_number as string) ?? (src.adsh as string) ?? '';
     const displayNames = src.display_names as string[] | undefined;
     const companyName = displayNames?.[0] ?? 'Unknown';
     if (!cik) continue;

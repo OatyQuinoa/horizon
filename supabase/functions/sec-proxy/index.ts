@@ -22,13 +22,16 @@ Deno.serve(async (req: Request) => {
     if (pathname.includes('api/sec/search') || pathname.endsWith('search')) {
       const dateFrom = url.searchParams.get('dateFrom') ?? '';
       const dateTo = url.searchParams.get('dateTo') ?? '';
-      const start = Math.max(0, Number(url.searchParams.get('start') ?? url.searchParams.get('from') ?? 0));
-      const count = Math.min(400, Math.max(1, Number(url.searchParams.get('count') ?? url.searchParams.get('size') ?? 400)));
+      const from = Math.max(0, Number(url.searchParams.get('from') ?? url.searchParams.get('start') ?? 0));
+      const size = Math.min(400, Math.max(1, Number(url.searchParams.get('size') ?? url.searchParams.get('count') ?? 400)));
       const layer = url.searchParams.get('layer') ?? 'pipeline';
       const formsQuery = layer === 'confirmation' ? 'forms:424B4' : 'forms:(S-1 OR "S-1/A" OR F-1 OR "F-1/A")';
-      const searchUrl = `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(formsQuery)}&dateRange=custom&startdt=${dateFrom}&enddt=${dateTo}&start=${start}&count=${count}`;
+      const searchUrl = 'https://efts.sec.gov/LATEST/search-index';
+      const bodyJson = { q: formsQuery, dateRange: 'custom', startdt: dateFrom, enddt: dateTo, from, size };
       const res = await fetch(searchUrl, {
-        headers: { 'User-Agent': SEC_USER_AGENT, Accept: 'application/json' },
+        method: 'POST',
+        headers: { 'User-Agent': SEC_USER_AGENT, 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(bodyJson),
       });
       const body = await res.text();
       return new Response(body, {
