@@ -170,8 +170,8 @@ function parseSearchHits(hits: unknown[], layer: 'pipeline' | 'confirmation'): R
 
 async function fetchViaSearch(dateFrom: string, dateTo: string, layer: 'pipeline' | 'confirmation' = 'pipeline'): Promise<RecentFiling[]> {
   const byKey = new Map<string, RecentFiling>();
-  for (let from = 0; from < 800; from += SEARCH_PAGE_SIZE) {
-    const url = `${API_BASE}/api/sec/search?dateFrom=${encodeURIComponent(dateFrom)}&dateTo=${encodeURIComponent(dateTo)}&layer=${layer}&from=${from}&size=${SEARCH_PAGE_SIZE}`;
+  for (let start = 0; start < 800; start += SEARCH_PAGE_SIZE) {
+    const url = `${API_BASE}/api/sec/search?dateFrom=${encodeURIComponent(dateFrom)}&dateTo=${encodeURIComponent(dateTo)}&layer=${layer}&start=${start}&count=${SEARCH_PAGE_SIZE}`;
     console.log(`${LOG_PREFIX} GET ${url}`);
     try {
       const res = await fetch(url);
@@ -181,6 +181,10 @@ async function fetchViaSearch(dateFrom: string, dateTo: string, layer: 'pipeline
       }
       const data = await res.json();
       const hits = data?.hits?.hits ?? [];
+      const total = (data?.hits?.total as { value?: number })?.value ?? data?.hits?.total;
+      if (typeof total === 'number' && process.env.NODE_ENV === 'development') {
+        console.log(`${LOG_PREFIX} Search ${layer} page start=${start}: total=${total}, returned=${hits.length}`);
+      }
       const list = parseSearchHits(hits, layer);
       if (list.length === 0) break;
       for (const f of list) byKey.set(`${f.cik}-${f.accessionNumber}`, f);

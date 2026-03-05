@@ -1,10 +1,10 @@
 /**
  * Vercel serverless: proxy SEC full-text search for IPO-related filings.
- * GET /api/sec/search?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD&layer=pipeline|confirmation
+ * GET /api/sec/search?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD&layer=pipeline|confirmation&start=0&count=400
  *
+ * SEC efts.sec.gov uses start (offset) and count (page size); default is 30 if omitted.
  * layer=pipeline  → S-1, S-1/A, F-1, F-1/A (intent / registration)
  * layer=confirmation → 424B4 (final prospectus / IPO completed)
- * layer=all or omit → pipeline only (default)
  */
 const SEC_USER_AGENT = 'Prospecti-InvestmentResearch/1.0 (contact@prospecti-app.com)';
 
@@ -22,10 +22,10 @@ export default async function handler(req, res) {
   const dateFrom = req.query.dateFrom ?? '';
   const dateTo = req.query.dateTo ?? '';
   const layer = req.query.layer ?? 'pipeline';
-  const from = Math.max(0, Number(req.query.from) || 0);
-  const size = Math.min(400, Math.max(1, Number(req.query.size) || 400));
+  const start = Math.max(0, Number(req.query.start) || Number(req.query.from) || 0);
+  const count = Math.min(400, Math.max(1, Number(req.query.count) || Number(req.query.size) || 400));
   const formsQuery = LAYER_QUERIES[layer] ?? LAYER_QUERIES.pipeline;
-  const searchUrl = `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(formsQuery)}&dateRange=custom&startdt=${dateFrom}&enddt=${dateTo}&from=${from}&size=${size}`;
+  const searchUrl = `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(formsQuery)}&dateRange=custom&startdt=${dateFrom}&enddt=${dateTo}&start=${start}&count=${count}`;
   try {
     const secRes = await fetch(searchUrl, {
       headers: {

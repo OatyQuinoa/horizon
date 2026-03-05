@@ -22,7 +22,11 @@ Deno.serve(async (req: Request) => {
     if (pathname.includes('api/sec/search') || pathname.endsWith('search')) {
       const dateFrom = url.searchParams.get('dateFrom') ?? '';
       const dateTo = url.searchParams.get('dateTo') ?? '';
-      const searchUrl = `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent('forms:(S-1 OR "S-1/A")')}&dateRange=custom&startdt=${dateFrom}&enddt=${dateTo}&from=0&size=100`;
+      const start = Math.max(0, Number(url.searchParams.get('start') ?? url.searchParams.get('from') ?? 0));
+      const count = Math.min(400, Math.max(1, Number(url.searchParams.get('count') ?? url.searchParams.get('size') ?? 400)));
+      const layer = url.searchParams.get('layer') ?? 'pipeline';
+      const formsQuery = layer === 'confirmation' ? 'forms:424B4' : 'forms:(S-1 OR "S-1/A" OR F-1 OR "F-1/A")';
+      const searchUrl = `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(formsQuery)}&dateRange=custom&startdt=${dateFrom}&enddt=${dateTo}&start=${start}&count=${count}`;
       const res = await fetch(searchUrl, {
         headers: { 'User-Agent': SEC_USER_AGENT, Accept: 'application/json' },
       });
