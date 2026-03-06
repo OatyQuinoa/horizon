@@ -58,12 +58,13 @@ The app reads **one** variable: **`DATABASE_URL`**. That must be your **PostgreS
 
 1. In [Supabase](https://supabase.com): open your project → **Project Settings** (gear) → **Database**.
 2. Under **Connection string**, choose **URI**.
-3. Copy the URI. It looks like:
+3. **Use the Pooler URI** (Session mode or Transaction mode), not the Direct connection. The Direct host (`db.[project-ref].supabase.co`) often fails with `ENOTFOUND` on some networks; the pooler host (`aws-0-[region].pooler.supabase.com`) is more reliable.
+4. Copy the pooler URI. It looks like:
    ```text
    postgresql://postgres.[project-ref]:[YOUR-PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres
    ```
-4. Replace `[YOUR-PASSWORD]` with your database password (the one you set for the `postgres` user, or from **Database** → **Reset database password** if needed).
-5. For serverless (Vercel), use the **Session mode** (port **5432**) or **Transaction mode** (port **6543**) pooler URL from that page; both are valid.
+5. Replace `[YOUR-PASSWORD]` with your database password (the one you set for the `postgres` user, or from **Database** → **Reset database password** if needed).
+6. For serverless (Vercel), Transaction mode (port **6543**) or Session mode (port **5432**) both work.
 
 ### Local development
 
@@ -105,3 +106,10 @@ The Dashboard fetches IPO listings from `/api/ipos` only. No direct SEC requests
 
 - **Production:** Vercel serves `/api/ipos` and connects to your Postgres.
 - **Local:** Use `vercel dev` to run API routes locally with `DATABASE_URL`, or point the app at a deployed API.
+
+## Deploy checklist
+
+1. Set **DATABASE_URL** in Vercel (Project → Settings → Environment Variables) to your Supabase Pooler URI.
+2. Apply schema once: run `npm run db:schema` locally with the same DATABASE_URL, or run the SQL in `scripts/schema.sql` via Supabase SQL Editor.
+3. Ingest IPO data: run `npm run db:ingest` (or schedule it via cron). Verify with `npm run db:check` (reports 2025 QTR1–QTR4 counts).
+4. Deploy the app. The Dashboard defaults to **All (2025–2026)** so users see the full ingested range; they can switch to Week/Month/Quarterly/Yearly.

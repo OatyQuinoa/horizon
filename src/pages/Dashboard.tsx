@@ -19,6 +19,7 @@ const TIME_FRAME_OPTIONS = [
   { value: 'month', label: 'Month', days: 30 },
   { value: 'quarterly', label: 'Quarterly', days: 90 },
   { value: 'yearly', label: 'Yearly', days: 365 },
+  { value: 'all', label: 'All (2025–2026)', days: 500 },
 ] as const;
 
 const FILING_TYPE_OPTIONS = [
@@ -51,7 +52,7 @@ export default function Dashboard() {
   const error = ctx?.error ?? null;
   const dataSource = ctx?.dataSource ?? 'loading';
   const refetch = ctx?.refetch ?? (() => Promise.resolve());
-  const dashboardFilters = ctx?.dashboardFilters ?? { timeFrame: 'month', sectorFilter: 'all', filingTypeFilter: 'all' };
+  const dashboardFilters = ctx?.dashboardFilters ?? { timeFrame: 'all', sectorFilter: 'all', filingTypeFilter: 'all' };
   const setDashboardFilters = ctx?.setDashboardFilters ?? (() => {});
 
   const { timeFrame, sectorFilter, filingTypeFilter } = dashboardFilters;

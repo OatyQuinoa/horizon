@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "start": "node server/index.js",
     "db:ingest": "tsx scripts/ingest-sec-ipos.ts",
+    "db:schema": "node scripts/apply-schema.mjs",
     "db:check": "node scripts/check-ipo-db.mjs",
     "types:supabase": "npx supabase gen types typescript --project-id $SUPABASE_PROJECT_ID > src/types/supabase.ts"
   },
@@ -54,6 +55,7 @@
     "input-otp": "^1.4.2",
     "lucide-react": "^0.394.0",
     "next-themes": "^0.4.6",
+    "dotenv": "^16.4.5",
     "pg": "^8.20.0",
     "react": "^18.2.0",
     "react-day-picker": "^9.12.0",

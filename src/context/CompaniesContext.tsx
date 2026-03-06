@@ -12,7 +12,7 @@ export interface DashboardFilters {
 }
 
 const DEFAULT_FILTERS: DashboardFilters = {
-  timeFrame: 'month',
+  timeFrame: 'all',
   sectorFilter: 'all',
   filingTypeFilter: 'all',
 };
@@ -48,7 +48,7 @@ function SecFilingsLoader({
   setLastUpdated: (v: Date | null) => void;
   refetchRef: React.MutableRefObject<(() => Promise<void>) | undefined>;
 }) {
-  const { filings, isLoading, error, dataSource, lastUpdated, refetch } = useSecFilings(365, 'all');
+  const { filings, isLoading, error, dataSource, lastUpdated, refetch } = useSecFilings(500, 'all');
 
   refetchRef.current = refetch;
 

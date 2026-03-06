@@ -4,10 +4,10 @@
  * Downloads quarterly master.idx files, parses IPO-related rows (S-1, S-1/A, 424B4),
  * and inserts into PostgreSQL with ON CONFLICT (accession_number) DO NOTHING.
  *
- * Prerequisites: DATABASE_URL set, schema applied (scripts/schema.sql).
- * Usage: npx tsx scripts/ingest-sec-ipos.ts   OR   npm run db:ingest
+ * Prerequisites: DATABASE_URL in .env or environment, schema applied (scripts/schema.sql).
+ * Usage: npm run db:ingest
  */
-
+import 'dotenv/config';
 import pg from 'pg';
 import https from 'https';
 
@@ -123,10 +123,13 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const pool = new pg.Pool({
-    connectionString,
-    ssl: connectionString.includes('localhost') ? false : { rejectUnauthorized: true },
-  });
+  const isSupabasePooler = connectionString.includes('pooler.supabase.com');
+  const ssl = connectionString.includes('localhost')
+    ? false
+    : isSupabasePooler
+      ? { rejectUnauthorized: false }
+      : { rejectUnauthorized: true };
+  const pool = new pg.Pool({ connectionString, ssl });
   const client = await pool.connect();
 
   let totalInserted = 0;

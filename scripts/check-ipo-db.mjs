@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
  * Check whether ipo_filings has been populated and where the database is.
- * Usage: DATABASE_URL='...' node scripts/check-ipo-db.mjs
+ * Loads .env from project root if present. Usage: npm run db:check
  */
-
+import 'dotenv/config';
 import pg from 'pg';
 
 function maskConnectionString(url) {
@@ -27,10 +27,13 @@ async function main() {
 
   console.log('Database (masked):', maskConnectionString(connectionString));
 
-  const pool = new pg.Pool({
-    connectionString,
-    ssl: connectionString.includes('localhost') ? false : { rejectUnauthorized: true },
-  });
+  const isSupabasePooler = connectionString.includes('pooler.supabase.com');
+  const ssl = connectionString.includes('localhost')
+    ? false
+    : isSupabasePooler
+      ? { rejectUnauthorized: false }
+      : { rejectUnauthorized: true };
+  const pool = new pg.Pool({ connectionString, ssl });
 
   try {
     const countResult = await pool.query('SELECT COUNT(*)::int AS count FROM ipo_filings');
@@ -38,6 +41,20 @@ async function main() {
     console.log('ipo_filings row count:', count);
 
     if (count > 0) {
+      const quarters = [
+        { label: '2025 QTR1', from: '2025-01-01', to: '2025-03-31' },
+        { label: '2025 QTR2', from: '2025-04-01', to: '2025-06-30' },
+        { label: '2025 QTR3', from: '2025-07-01', to: '2025-09-30' },
+        { label: '2025 QTR4', from: '2025-10-01', to: '2025-12-31' },
+      ];
+      console.log('\n2025 quarters (from full-index 2025/QTR1–QTR4):');
+      for (const q of quarters) {
+        const r = await pool.query(
+          'SELECT COUNT(*)::int AS n FROM ipo_filings WHERE filing_date BETWEEN $1::date AND $2::date',
+          [q.from, q.to]
+        );
+        console.log(`  ${q.label}: ${r.rows[0].n} filings`);
+      }
       const sample = await pool.query(
         `SELECT cik, company_name, form_type, filing_date, accession_number
          FROM ipo_filings ORDER BY filing_date DESC LIMIT 5`
@@ -58,6 +75,16 @@ async function main() {
     console.error('Error:', err.message);
     if (err.message.includes('relation "ipo_filings" does not exist')) {
       console.log('Apply the schema first: psql $DATABASE_URL -f scripts/schema.sql');
+    }
+    if (err.message.includes('ENOTFOUND')) {
+      try {
+        const u = new URL(connectionString);
+        if (u.hostname.startsWith('db.') && u.hostname.endsWith('.supabase.co')) {
+          console.log('\nSupabase "Direct" host (db.*.supabase.co) often fails with ENOTFOUND on some networks.');
+          console.log('Use the Pooler connection string instead: Supabase → Project Settings → Database → Connection string → URI (Session or Transaction mode).');
+          console.log('Example: postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres');
+        }
+      } catch (_) {}
     }
     process.exit(1);
   } finally {

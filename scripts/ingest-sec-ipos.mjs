@@ -2,12 +2,11 @@
 /**
  * SEC EDGAR IPO ingestion script.
  * Downloads quarterly master.idx files, parses IPO-related rows (S-1, S-1/A, 424B4),
- * filters by date range 2025-01-01 to 2026-01-31, and upserts into PostgreSQL.
- *
- * Prerequisites: DATABASE_URL set, schema applied (scripts/schema.sql).
- * Usage: node scripts/ingest-sec-ipos.mjs
+ * and inserts into PostgreSQL. Loads .env if present.
+ * Prerequisites: DATABASE_URL in .env or environment, schema applied (scripts/schema.sql).
+ * Usage: node scripts/ingest-sec-ipos.mjs  or  npm run db:ingest
  */
-
+import 'dotenv/config';
 import pg from 'pg';
 import https from 'https';
 
@@ -101,7 +100,13 @@ async function main() {
     process.exit(1);
   }
 
-  const pool = new pg.Pool({ connectionString });
+  const isSupabasePooler = connectionString.includes('pooler.supabase.com');
+  const ssl = connectionString.includes('localhost')
+    ? false
+    : isSupabasePooler
+      ? { rejectUnauthorized: false }
+      : { rejectUnauthorized: true };
+  const pool = new pg.Pool({ connectionString, ssl });
   const client = await pool.connect();
 
   let totalInserted = 0;
