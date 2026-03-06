@@ -13,7 +13,6 @@ import { mockCompanies } from '@/data/mockData';
 import {
   RecentFiling,
   fetchRecentS1Filings,
-  fetchCompanyByCik,
   formatFilingDate,
   getRelativeDate,
 } from '@/lib/sec-filing-service';
@@ -113,29 +112,12 @@ export function useSecFilings(
       console.log(`${LOG} useSecFilings: SEC returned ${secFilings.length} filings`);
 
       if (secFilings.length > 0) {
+        // Data is from /api/ipos (database); no SEC enrichment to avoid proxy calls
         const filterBySector = sectorFilter !== 'all';
-        const CONCURRENCY = 6;
-        const enriched: Array<RecentFiling & { sicCode?: string; sicDescription?: string }> = [];
-
-        for (let i = 0; i < secFilings.length; i += CONCURRENCY) {
-          const batch = secFilings.slice(i, i + CONCURRENCY);
-          const results = await Promise.all(
-            batch.map(async (filing) => {
-              const company = await fetchCompanyByCik(filing.cik);
-              const sicCode = company?.sicCode ?? undefined;
-              const sicDescription = company?.sicDescription ?? undefined;
-              return { filing, sicCode, sicDescription };
-            })
-          );
-          for (const { filing, sicCode, sicDescription } of results) {
-            if (filterBySector && !sicMatchesSector(sicCode ?? null, sectorFilter)) continue;
-            enriched.push({ ...filing, sicCode, sicDescription });
-          }
-        }
-
-        if (filterBySector) {
-          console.log(`${LOG} useSecFilings: after sector filter: ${enriched.length} filings`);
-        }
+        const enriched = secFilings.filter((filing) => {
+          if (!filterBySector) return true;
+          return sicMatchesSector(undefined, sectorFilter);
+        });
         setRecentFilings(enriched);
 
         const convertedFilings: Company[] = enriched.map((filing) => ({
@@ -143,9 +125,9 @@ export function useSecFilings(
           cik: filing.cik,
           name: filing.companyName,
           ticker: '',
-          sector: filing.sicDescription ? sectorLabel(filing.sicDescription) : (sectorFilter === 'software' ? 'Technology' : '—'),
-          sicCode: filing.sicCode,
-          sicDescription: filing.sicDescription,
+          sector: '—',
+          sicCode: undefined,
+          sicDescription: undefined,
           filingDate: filing.filingDate,
           filingDates:
             filing.ipoStatus === 'completed'
@@ -178,7 +160,7 @@ export function useSecFilings(
       setFilings([]);
       setRecentFilings([]);
       setDataSource('curated');
-      setError('Live SEC data unavailable. Use npm run dev or npm run start so the proxy can reach SEC EDGAR.');
+      setError('IPO data unavailable. Ensure the database is connected and ingestion has run (see scripts/ingest-sec-ipos.mjs).');
       setLastUpdated(new Date());
     } finally {
       setIsLoading(false);
@@ -207,9 +189,9 @@ export function useSecFilings(
 export function getDataSourceLabel(source: 'sec-api' | 'curated' | 'loading'): string {
   switch (source) {
     case 'sec-api':
-      return 'Live from SEC EDGAR';
+      return 'From database';
     case 'curated':
-      return 'Curated IPO data';
+      return 'Unavailable';
     case 'loading':
       return 'Loading...';
   }

@@ -1,12 +1,8 @@
 /**
  * SEC EDGAR IPO filing service
  *
- * Dual-layer model:
- * - Pipeline (intent): S-1, S-1/A, F-1, F-1/A — "IPO may happen"
- * - Confirmation (completed): 424B4 — "IPO did happen"
- *
- * Fetches via app proxy (/api/sec/*). Strategy: try full-text search first;
- * if 0 results or error, use RSS/Atom feeds. Correlates by CIK to classify status.
+ * Primary: database-backed pipeline — frontend fetches from /api/ipos (PostgreSQL).
+ * Legacy: SEC proxy only used by ingestion script and prospectus/full-filing flows.
  */
 
 import { constructCompanySearchUrl, constructFullFilingTextUrl, isSoftwareCompany as isSoftwareSic, padCik } from '@/lib/sec-api';
@@ -60,7 +56,39 @@ function isDateInRange(dateStr: string, dateFrom: string, dateTo: string): boole
 }
 
 // ---------------------------------------------------------------------------
-// Fetch IPO filings: pipeline (S-1/F-1) + confirmation (424B4) + correlation
+// Database-backed IPO list (primary path: no SEC calls on page load)
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch IPO filings from internal API (PostgreSQL). Used by the frontend so that
+ * SEC is only queried during scheduled ingestion, not on every page load.
+ */
+export async function fetchIposFromApi(dateFrom: string, dateTo: string): Promise<RecentFiling[]> {
+  const params = new URLSearchParams({ dateFrom, dateTo });
+  const res = await fetch(`${API_BASE}/api/ipos?${params.toString()}`);
+  if (!res.ok) throw new Error(`IPO API error: ${res.status}`);
+  const data = await res.json();
+  const rows = data?.filings ?? [];
+  return rows.map((row: { cik: string; company_name: string; form_type: string; filing_date: string; accession_number: string; sec_url: string }) => {
+    const cik = String(row.cik ?? '').replace(/\D/g, '').padStart(10, '0');
+    const filingDate = (row.filing_date ?? '').slice(0, 10);
+    const formType = row.form_type ?? 'S-1';
+    const ipoStatus = formType === '424B4' ? ('completed' as const) : ('pipeline' as const);
+    return {
+      id: `${cik}-${row.accession_number ?? ''}`,
+      cik,
+      companyName: row.company_name ?? 'Unknown',
+      filingDate,
+      formType,
+      accessionNumber: row.accession_number ?? '',
+      secIndexUrl: row.sec_url ?? constructCompanySearchUrl(cik, formType),
+      ipoStatus,
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Fetch IPO filings: pipeline (S-1/F-1) + confirmation (424B4) + correlation (legacy SEC path)
 // ---------------------------------------------------------------------------
 
 const LOG_PREFIX = '[SEC IPO]';
@@ -102,10 +130,20 @@ export async function fetchIPOFilings(daysBack: number): Promise<RecentFiling[]>
 }
 
 /**
- * Fetch pipeline filings (S-1, S-1/A, F-1, F-1/A). Backward-compatible entry point.
+ * Fetch IPO filings for the frontend. Uses database API first; no SEC calls on page load.
  */
 export async function fetchRecentS1Filings(daysBack: number): Promise<RecentFiling[]> {
-  return fetchIPOFilings(daysBack);
+  const { dateFrom, dateTo } = getDateRange(daysBack);
+  try {
+    const list = await fetchIposFromApi(dateFrom, dateTo);
+    if (list.length > 0) {
+      console.log(`${LOG_PREFIX} fetchRecentS1Filings: ${list.length} from /api/ipos`);
+      return list.sort((a, b) => (b.filingDate || '').localeCompare(a.filingDate || ''));
+    }
+  } catch (e) {
+    console.warn(`${LOG_PREFIX} fetchRecentS1Filings: API failed, no fallback`, e);
+  }
+  return [];
 }
 
 async function fetchPipelineFilings(dateFrom: string, dateTo: string): Promise<RecentFiling[]> {
