@@ -2,35 +2,78 @@
 
 The app uses a **database-backed** architecture so that SEC.gov is only queried during scheduled ingestion, not on every page load.
 
+## Data source (full-index, not daily-index)
+
+Ingestion uses the **full-index** quarterly master files, not the daily-index:
+
+- **Used:** `https://www.sec.gov/Archives/edgar/full-index/2025/QTR1/master.idx` (and QTR2–QTR4, 2026/QTR1)
+- **Not used:** `https://www.sec.gov/Archives/edgar/daily-index/2025/` (daily index)
+
+The full-index quarterly files contain all filings for that quarter; 2025 QTR1–QTR4 are ingested.
+
 ## Architecture
 
 ```
-SEC EDGAR full-index (master.idx)
+SEC EDGAR full-index (master.idx) — quarterly
         ↓
-Scheduled ingestion script
+Ingestion script (scripts/ingest-sec-ipos.ts)
         ↓
-PostgreSQL (e.g. Vercel Postgres)
+PostgreSQL (DATABASE_URL)
         ↓
 GET /api/ipos
         ↓
 Frontend (Dashboard)
 ```
 
-## 1. Database
+## 1. Database (where the data lives)
 
+The IPO data is stored in **PostgreSQL** pointed to by the **`DATABASE_URL`** environment variable. The app does not bundle a database; you provide your own (e.g. Vercel Postgres, Supabase, Neon, or local Postgres).
+
+- **Table:** `ipo_filings` (see `scripts/schema.sql`)
 - **Schema:** `scripts/schema.sql`
-- **Setup:** Run the schema against your Postgres instance (e.g. Vercel Postgres).
+- **Setup:** Run the schema against your Postgres instance:
   ```bash
   psql $DATABASE_URL -f scripts/schema.sql
   ```
+- **Check that data exists:** Run the check script (uses same `DATABASE_URL`):
+  ```bash
+  npm run db:check
+  ```
+  This prints the database location (host masked), row count, and sample rows.
 
-## 2. Environment
+## 2. Environment — linking DATABASE_URL (Vercel + Supabase)
 
-Set in your environment (e.g. Vercel project settings or `.env`):
+The app reads **one** variable: **`DATABASE_URL`**. That must be your **PostgreSQL connection string** (not the Supabase API URL).
 
+### In Vercel (for deployed `/api/ipos`)
+
+1. Open your project on [Vercel](https://vercel.com) → **Settings** → **Environment Variables**.
+2. Add a variable:
+   - **Name:** `DATABASE_URL`
+   - **Value:** your Supabase PostgreSQL connection string (see below).
+   - Apply to **Production**, **Preview**, and **Development** if you use them.
+3. Redeploy so the new variable is applied.
+
+### Getting the connection string from Supabase
+
+1. In [Supabase](https://supabase.com): open your project → **Project Settings** (gear) → **Database**.
+2. Under **Connection string**, choose **URI**.
+3. Copy the URI. It looks like:
+   ```text
+   postgresql://postgres.[project-ref]:[YOUR-PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres
+   ```
+4. Replace `[YOUR-PASSWORD]` with your database password (the one you set for the `postgres` user, or from **Database** → **Reset database password** if needed).
+5. For serverless (Vercel), use the **Session mode** (port **5432**) or **Transaction mode** (port **6543**) pooler URL from that page; both are valid.
+
+### Local development
+
+Create a `.env` in the project root (see `.env.example`):
+
+```bash
+DATABASE_URL=postgresql://postgres.[project-ref]:[YOUR-PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres
 ```
-DATABASE_URL=postgresql://...
-```
+
+Never commit `.env` (it’s in `.gitignore`). The app and scripts (`api/ipos`, `db:ingest`, `db:check`) all use `process.env.DATABASE_URL`.
 
 ## 3. Ingestion
 

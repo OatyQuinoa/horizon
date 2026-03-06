@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "start": "node server/index.js",
     "db:ingest": "tsx scripts/ingest-sec-ipos.ts",
+    "db:check": "node scripts/check-ipo-db.mjs",
     "types:supabase": "npx supabase gen types typescript --project-id $SUPABASE_PROJECT_ID > src/types/supabase.ts"
   },
   "dependencies": {
