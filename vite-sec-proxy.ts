@@ -1,9 +1,11 @@
 /**
  * Vite plugin: SEC EDGAR proxy for development.
- * Handles /api/sec/search and /api/sec/submissions/CIK* to bypass CORS.
- * SEC requires User-Agent and rate limit (10 req/sec); we use 150ms between requests.
+ * Handles /api/ipos (database) and /api/sec/* (SEC EDGAR) so the UI works with npm run dev.
+ * SEC requires User-Agent and rate limit; we use 150ms between requests.
  */
 import type { Plugin } from 'vite';
+import 'dotenv/config';
+import pg from 'pg';
 
 const SEC_USER_AGENT = 'Prospecti-InvestmentResearch/1.0 (contact@prospecti-app.com)';
 const MIN_REQUEST_INTERVAL_MS = 150;
@@ -57,12 +59,85 @@ async function rateLimitedFetch(url: string, init?: RequestInit): Promise<Respon
   });
 }
 
+const DEFAULT_DATE_FROM = '2025-01-01';
+const DEFAULT_DATE_TO = '2026-01-31';
+
+async function handleIposApi(url: string, res: import('connect').ServerResponse): Promise<boolean> {
+  const parsed = new URL(url, 'http://localhost');
+  const dateFrom = parsed.searchParams.get('dateFrom') ?? DEFAULT_DATE_FROM;
+  const dateTo = parsed.searchParams.get('dateTo') ?? DEFAULT_DATE_TO;
+  const formType = parsed.searchParams.get('form_type')?.trim() || null;
+  const companyName = parsed.searchParams.get('company_name')?.trim() || null;
+  const cik = parsed.searchParams.get('cik')?.trim() || null;
+
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ filings: [], _message: 'DATABASE_URL not set; run with .env or vercel dev' }));
+    return true;
+  }
+
+  const isSupabasePooler = connectionString.includes('pooler.supabase.com');
+  const ssl = connectionString.includes('localhost')
+    ? false
+    : isSupabasePooler
+      ? { rejectUnauthorized: false }
+      : { rejectUnauthorized: true };
+
+  const pool = new pg.Pool({ connectionString, ssl });
+  try {
+    let sql = `
+      SELECT cik, company_name, form_type, filing_date, accession_number, accession_no_dash, sec_filename, sec_url, created_at
+      FROM ipo_filings
+      WHERE filing_date BETWEEN $1::date AND $2::date
+    `;
+    const params: (string | number)[] = [dateFrom, dateTo];
+    let n = 3;
+    if (formType) {
+      sql += ` AND form_type = $${n}`;
+      params.push(formType);
+      n += 1;
+    }
+    if (companyName) {
+      sql += ` AND company_name ILIKE $${n}`;
+      params.push(`%${companyName}%`);
+      n += 1;
+    }
+    if (cik) {
+      const cikNorm = cik.replace(/\D/g, '').padStart(10, '0');
+      sql += ` AND REPLACE(LPAD(TRIM(cik), 10, '0'), ' ', '0') = $${n}`;
+      params.push(cikNorm);
+      n += 1;
+    }
+    sql += ` ORDER BY filing_date DESC`;
+    const result = await pool.query(sql, params);
+    res.writeHead(200, {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+    });
+    res.end(JSON.stringify({ filings: result.rows }));
+  } catch (err) {
+    console.error('[vite /api/ipos]', err);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Database error', detail: String((err as Error).message) }));
+  } finally {
+    await pool.end();
+  }
+  return true;
+}
+
 export function secProxyPlugin(): Plugin {
   return {
     name: 'sec-proxy',
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         const url = req.url ?? '';
+
+        if (req.method === 'GET' && url.startsWith('/api/ipos')) {
+          const handled = await handleIposApi(url, res);
+          if (handled) return;
+        }
+
         if (!url.startsWith('/api/sec/')) {
           next();
           return;

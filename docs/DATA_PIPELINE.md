@@ -105,7 +105,7 @@ The Dashboard fetches IPO listings from `/api/ipos` only. No direct SEC requests
 ## Local development
 
 - **Production:** Vercel serves `/api/ipos` and connects to your Postgres.
-- **Local:** Use `vercel dev` to run API routes locally with `DATABASE_URL`, or point the app at a deployed API.
+- **Local:** With `npm run dev` (Vite), the dev server proxies `/api/ipos` and queries the database using `DATABASE_URL` from `.env`. Ensure `.env` exists with `DATABASE_URL` so the Dashboard can show IPO filings. Alternatively use `vercel dev` to run the full stack.
 
 ## Deploy checklist
 
