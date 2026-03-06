@@ -160,7 +160,7 @@ export function useSecFilings(
       setFilings([]);
       setRecentFilings([]);
       setDataSource('curated');
-      setError('IPO data unavailable. Ensure the database is connected and ingestion has run (see scripts/ingest-sec-ipos.mjs).');
+      setError('IPO data unavailable. Ensure the database is connected and ingestion has run (npm run db:ingest).');
       setLastUpdated(new Date());
     } finally {
       setIsLoading(false);
