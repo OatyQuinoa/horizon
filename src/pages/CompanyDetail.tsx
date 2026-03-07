@@ -5,10 +5,13 @@ function ViewProspectusLink({
   cik,
   accessionNumber,
   primaryDocument,
+  ipoStatus,
 }: {
   cik: string;
   accessionNumber: string;
   primaryDocument?: string;
+  /** Pipeline = S-1; Completed = 424B4. Drives button label. */
+  ipoStatus?: 'pipeline' | 'completed';
 }) {
   const [url, setUrl] = useState<string | null>(null);
   const cleanCik = String(cik).replace(/\D/g, '').replace(/^0+/, '') || cik;
@@ -33,6 +36,9 @@ function ViewProspectusLink({
     return () => { cancelled = true; };
   }, [cik, accessionNumber, directProspectusUrl]);
   const displayUrl = directProspectusUrl ?? url ?? fallbackIndexUrl;
+  const label = ipoStatus === 'pipeline'
+    ? 'View Initial Registration Statement (S-1)'
+    : 'View Prospectus';
   return (
     <a
       href={displayUrl}
@@ -41,7 +47,7 @@ function ViewProspectusLink({
       className="inline-flex items-center gap-2 text-sm text-primary hover:text-primary/80 transition-colors"
     >
       <FileText className="w-4 h-4" />
-      View Prospectus
+      {label}
       <ExternalLink className="w-3 h-3" />
     </a>
   );
@@ -288,6 +294,7 @@ export default function CompanyDetail() {
                   cik={company.cik}
                   accessionNumber={company.accessionNumber}
                   primaryDocument={company.primaryDocument}
+                  ipoStatus={company.ipoStatus}
                 />
               )}
               {company.accessionNumber && company.cik && (
