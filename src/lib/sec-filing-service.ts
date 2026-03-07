@@ -66,8 +66,15 @@ function isDateInRange(dateStr: string, dateFrom: string, dateTo: string): boole
 export async function fetchIposFromApi(dateFrom: string, dateTo: string): Promise<RecentFiling[]> {
   const params = new URLSearchParams({ dateFrom, dateTo });
   const res = await fetch(`${API_BASE}/api/ipos?${params.toString()}`);
-  if (!res.ok) throw new Error(`IPO API error: ${res.status}`);
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
+  const hint = data?._hint ?? data?._message;
+  if (!res.ok) {
+    throw new Error(hint && typeof hint === 'string' ? hint : `IPO API error: ${res.status}`);
+  }
+  // Dev proxy returns 200 with empty filings + _message when DATABASE_URL is not set
+  if (data?.filings?.length === 0 && hint && typeof hint === 'string') {
+    throw new Error(hint);
+  }
   const rows = data?.filings ?? [];
   return rows.map((row: { cik: string; company_name: string; form_type: string; filing_date: string; accession_number: string; sec_url: string }) => {
     const cik = String(row.cik ?? '').replace(/\D/g, '').padStart(10, '0');

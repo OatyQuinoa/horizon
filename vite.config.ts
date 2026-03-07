@@ -20,8 +20,9 @@ export default defineConfig({
     },
   },
   server: {
+    // Listen on all interfaces so the app (and /api/ipos) work when opened from another device (e.g. laptop on same network).
     // @ts-ignore
     allowedHosts: process.env.TEMPO === "true" ? true : undefined,
-    host: process.env.TEMPO === "true" ? '0.0.0.0' : undefined,
+    host: '0.0.0.0',
   }
 });

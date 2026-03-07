@@ -15,6 +15,20 @@ export default async function handler(req, res) {
     return;
   }
 
+  // Deployed environments (e.g. Vercel): require DATABASE_URL so filings can load when opened from any device.
+  if (!process.env.DATABASE_URL) {
+    res.setHeader('Content-Type', 'application/json');
+    res.status(503).end(
+      JSON.stringify({
+        error: 'DATABASE_URL not set',
+        filings: [],
+        _hint:
+          'Set DATABASE_URL in your deployment environment (e.g. Vercel → Project Settings → Environment Variables) so filings load when the app is opened from this URL.',
+      })
+    );
+    return;
+  }
+
   const dateFrom = req.query.dateFrom ?? DEFAULT_DATE_FROM;
   const dateTo = req.query.dateTo ?? DEFAULT_DATE_TO;
   const formType = req.query.form_type?.trim() || null;
