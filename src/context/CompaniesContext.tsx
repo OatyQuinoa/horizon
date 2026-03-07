@@ -6,12 +6,21 @@ export type SecDataSource = 'sec-api' | 'curated' | 'loading';
 
 /** Dashboard filter state: persisted across navigation (e.g. when returning from company detail). */
 export interface DashboardFilters {
+  /** Search: company name, ticker (prospectus text later) */
+  searchQuery: string;
+  /** IPO year from filing date: 'all' | '2025' | '2024' */
+  ipoYear: string;
+  /** Exchange if listed: 'all' | 'nyse' | 'nasdaq' (more data later) */
+  exchange: string;
   timeFrame: string;
   sectorFilter: string;
   filingTypeFilter: string;
 }
 
 const DEFAULT_FILTERS: DashboardFilters = {
+  searchQuery: '',
+  ipoYear: '2025',
+  exchange: 'all',
   timeFrame: 'all',
   sectorFilter: 'all',
   filingTypeFilter: 'all',

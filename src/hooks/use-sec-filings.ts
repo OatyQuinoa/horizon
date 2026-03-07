@@ -208,12 +208,13 @@ function getLocalDateStr(date: Date): string {
 /** Filing type filter: all, IPO-priced (424B4), or S-1 (pipeline). */
 export type FilingTypeFilter = 'all' | 'completed' | 'pipeline';
 
-/** Filter companies by date range, sector, and filing type. Use with cached secFilings from context. */
+/** Filter companies by date range, sector, filing type, and optional IPO year. Use with cached secFilings from context. */
 export function filterFilingsForDisplay(
   companies: Company[],
   daysBack: number,
   sectorFilter: string,
-  filingTypeFilter: FilingTypeFilter = 'all'
+  filingTypeFilter: FilingTypeFilter = 'all',
+  ipoYear?: string
 ): Company[] {
   const to = new Date();
   const from = new Date(to);
@@ -224,6 +225,7 @@ export function filterFilingsForDisplay(
     const d = (c.filingDate || '').slice(0, 10);
     if (!d || d.length < 10) return false;
     if (d < dateFrom || d > dateTo) return false;
+    if (ipoYear && ipoYear !== 'all' && d.slice(0, 4) !== ipoYear) return false;
     if (filingTypeFilter !== 'all') {
       if (filingTypeFilter === 'completed' && c.ipoStatus !== 'completed') return false;
       if (filingTypeFilter === 'pipeline' && c.ipoStatus !== 'pipeline') return false;

@@ -4,7 +4,7 @@ import { useCompaniesOptional } from '@/context/CompaniesContext';
 import FilingCard from '@/components/FilingCard';
 import { motion } from 'framer-motion';
 import { getDataSourceLabel, filterFilingsForDisplay, type FilingTypeFilter } from '@/hooks/use-sec-filings';
-import { RefreshCw, Database, Globe, Filter } from 'lucide-react';
+import { RefreshCw, Database, Globe, Filter, Search } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 
 const TIME_FRAME_OPTIONS = [
   { value: 'week', label: 'Week', days: 7 },
@@ -20,6 +21,18 @@ const TIME_FRAME_OPTIONS = [
   { value: 'quarterly', label: 'Quarterly', days: 90 },
   { value: 'yearly', label: 'Yearly', days: 365 },
   { value: 'all', label: 'All (2025–2026)', days: 500 },
+] as const;
+
+const IPO_YEAR_OPTIONS = [
+  { value: 'all', label: 'All years' },
+  { value: '2025', label: '2025' },
+  { value: '2024', label: '2024' },
+] as const;
+
+const EXCHANGE_OPTIONS = [
+  { value: 'all', label: 'All exchanges' },
+  { value: 'nyse', label: 'NYSE' },
+  { value: 'nasdaq', label: 'NASDAQ' },
 ] as const;
 
 const FILING_TYPE_OPTIONS = [
@@ -52,19 +65,29 @@ export default function Dashboard() {
   const error = ctx?.error ?? null;
   const dataSource = ctx?.dataSource ?? 'loading';
   const refetch = ctx?.refetch ?? (() => Promise.resolve());
-  const dashboardFilters = ctx?.dashboardFilters ?? { timeFrame: 'all', sectorFilter: 'all', filingTypeFilter: 'all' };
+  const dashboardFilters = ctx?.dashboardFilters ?? { timeFrame: 'all', sectorFilter: 'all', filingTypeFilter: 'all', searchQuery: '', ipoYear: '2025', exchange: 'all' };
   const setDashboardFilters = ctx?.setDashboardFilters ?? (() => {});
 
-  const { timeFrame, sectorFilter, filingTypeFilter } = dashboardFilters;
+  const { timeFrame, sectorFilter, filingTypeFilter, searchQuery, ipoYear, exchange } = dashboardFilters;
 
   const daysBack = TIME_FRAME_OPTIONS.find((o) => o.value === timeFrame)?.days ?? 30;
 
-  // Filter cached SEC data by timeframe, sector, and filing type (IPO-priced vs S-1)
-  const displayFilings = filterFilingsForDisplay(secFilings, daysBack, sectorFilter, filingTypeFilter);
+  // Filter cached SEC data by timeframe, sector, filing type, and IPO year
+  const filteredByYearAndSector = filterFilingsForDisplay(secFilings, daysBack, sectorFilter, filingTypeFilter, ipoYear);
+
+  // Client-side search: company name, ticker (prospectus text later)
+  const q = searchQuery.trim().toLowerCase();
+  const displayFilings = q
+    ? filteredByYearAndSector.filter(
+        (c) =>
+          (c.name || '').toLowerCase().includes(q) ||
+          (c.ticker || '').toLowerCase().includes(q)
+      )
+    : filteredByYearAndSector;
 
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE);
-  }, [sectorFilter, timeFrame, filingTypeFilter]);
+  }, [sectorFilter, timeFrame, filingTypeFilter, ipoYear, exchange, searchQuery]);
 
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
   const recentFilings = displayFilings.slice(0, visibleCount);
@@ -98,7 +121,7 @@ export default function Dashboard() {
         </motion.section>
       )}
 
-      {/* Recent Filings Section — SEC EDGAR with filters */}
+      {/* Recent Filings Section — SEC EDGAR with search + filters */}
       <section className="space-y-6 sm:space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div>
@@ -130,23 +153,36 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Filter options: time frame + sector */}
-        <div className="flex flex-wrap items-end gap-4 sm:gap-6 p-4 rounded-lg border border-border bg-card/30">
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-muted-foreground shrink-0" />
-            <span className="text-sm font-medium text-foreground shrink-0">Filters</span>
+        {/* Search bar */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+          <Input
+            type="search"
+            placeholder="Company, ticker, or prospectus text"
+            value={searchQuery}
+            onChange={(e) => setDashboardFilters({ searchQuery: e.target.value })}
+            className="pl-9 h-10 rounded-lg border-border bg-card/30 text-foreground placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring"
+            aria-label="Search by company name, ticker, or prospectus text"
+          />
+        </div>
+
+        {/* Calm filters: IPO year, exchange, industry/sector, filing type */}
+        <div className="flex flex-wrap items-end gap-3 sm:gap-4 p-3 sm:p-4 rounded-lg bg-muted/20 border border-border/50">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Filter className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Filters</span>
           </div>
-          <div className="flex flex-wrap items-center gap-4 sm:gap-6">
-            <div className="flex flex-col gap-1.5 min-w-[140px]">
-              <Label htmlFor="time-frame" className="text-xs text-muted-foreground">
-                Time frame
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+            <div className="flex flex-col gap-1 min-w-[100px]">
+              <Label htmlFor="ipo-year" className="text-xs text-muted-foreground">
+                IPO year
               </Label>
-              <Select value={timeFrame} onValueChange={(v) => setDashboardFilters({ timeFrame: v })}>
-                <SelectTrigger id="time-frame" className="h-9 w-full sm:w-[160px]">
-                  <SelectValue placeholder="Time frame" />
+              <Select value={ipoYear} onValueChange={(v) => setDashboardFilters({ ipoYear: v })}>
+                <SelectTrigger id="ipo-year" className="h-8 w-full sm:w-[100px] text-sm border-border/70 bg-background/80">
+                  <SelectValue placeholder="Year" />
                 </SelectTrigger>
                 <SelectContent>
-                  {TIME_FRAME_OPTIONS.map((opt) => (
+                  {IPO_YEAR_OPTIONS.map((opt) => (
                     <SelectItem key={opt.value} value={opt.value}>
                       {opt.label}
                     </SelectItem>
@@ -154,12 +190,29 @@ export default function Dashboard() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex flex-col gap-1.5 min-w-[140px]">
+            <div className="flex flex-col gap-1 min-w-[120px]">
+              <Label htmlFor="exchange" className="text-xs text-muted-foreground">
+                Exchange
+              </Label>
+              <Select value={exchange} onValueChange={(v) => setDashboardFilters({ exchange: v })}>
+                <SelectTrigger id="exchange" className="h-8 w-full sm:w-[120px] text-sm border-border/70 bg-background/80">
+                  <SelectValue placeholder="Exchange" />
+                </SelectTrigger>
+                <SelectContent>
+                  {EXCHANGE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1 min-w-[140px]">
               <Label htmlFor="sector" className="text-xs text-muted-foreground">
-                Sector
+                Industry / sector
               </Label>
               <Select value={sectorFilter} onValueChange={(v) => setDashboardFilters({ sectorFilter: v })}>
-                <SelectTrigger id="sector" className="h-9 w-full sm:w-[220px]">
+                <SelectTrigger id="sector" className="h-8 w-full sm:w-[180px] text-sm border-border/70 bg-background/80">
                   <SelectValue placeholder="Sector" />
                 </SelectTrigger>
                 <SelectContent>
@@ -171,13 +224,13 @@ export default function Dashboard() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex flex-col gap-1.5 min-w-[160px]">
+            <div className="flex flex-col gap-1 min-w-[120px]">
               <Label htmlFor="filing-type" className="text-xs text-muted-foreground">
                 Filing type
               </Label>
               <Select value={filingTypeFilter} onValueChange={(v) => setDashboardFilters({ filingTypeFilter: v })}>
-                <SelectTrigger id="filing-type" className="h-9 w-full sm:w-[200px]">
-                  <SelectValue placeholder="Filing type" />
+                <SelectTrigger id="filing-type" className="h-8 w-full sm:w-[120px] text-sm border-border/70 bg-background/80">
+                  <SelectValue placeholder="Type" />
                 </SelectTrigger>
                 <SelectContent>
                   {FILING_TYPE_OPTIONS.map((opt) => (
@@ -200,7 +253,9 @@ export default function Dashboard() {
         {!isLoading && displayFilings.length === 0 && (
           <div className="rounded-lg border border-border bg-card/30 px-4 py-8 text-center text-sm text-muted-foreground">
             {dataSource === 'sec-api'
-              ? `No filings in the selected time frame (${TIME_FRAME_OPTIONS.find((o) => o.value === timeFrame)?.label ?? timeFrame}${sectorFilter !== 'all' ? `, ${SECTOR_OPTIONS.find((o) => o.value === sectorFilter)?.label ?? sectorFilter}` : ''}${filingTypeFilter !== 'all' ? `, ${FILING_TYPE_OPTIONS.find((o) => o.value === filingTypeFilter)?.label ?? filingTypeFilter}` : ''}).`
+              ? searchQuery.trim()
+                ? `No filings match “${searchQuery.trim()}” for ${IPO_YEAR_OPTIONS.find((o) => o.value === ipoYear)?.label ?? ipoYear}${sectorFilter !== 'all' ? `, ${SECTOR_OPTIONS.find((o) => o.value === sectorFilter)?.label ?? sectorFilter}` : ''}${filingTypeFilter !== 'all' ? `, ${FILING_TYPE_OPTIONS.find((o) => o.value === filingTypeFilter)?.label ?? filingTypeFilter}` : ''}. Try a different search or filters.`
+                : `No filings for ${IPO_YEAR_OPTIONS.find((o) => o.value === ipoYear)?.label ?? ipoYear}${sectorFilter !== 'all' ? `, ${SECTOR_OPTIONS.find((o) => o.value === sectorFilter)?.label ?? sectorFilter}` : ''}${filingTypeFilter !== 'all' ? `, ${FILING_TYPE_OPTIONS.find((o) => o.value === filingTypeFilter)?.label ?? filingTypeFilter}` : ''}.`
               : 'No recent filings to show. Start the dev server (npm run dev) or production server (npm run start) to load live SEC data.'}
           </div>
         )}
